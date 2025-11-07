@@ -1,0 +1,5 @@
+{
+  "name": "ClubConnect - Plataforma de Reserva de Pistas",
+  "description": "Una aplicación web multi-tenant y multi-deporte para la gestión y reserva de pistas deportivas. Permite a los administradores de clubs gestionar sus instalaciones y a los jugadores encontrar y reservar pistas fácilmente.",
+  "requestFramePermissions": []
+}
