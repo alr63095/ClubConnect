@@ -7,6 +7,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, pass: string) => Promise<void>;
+  register: (name: string, email: string, pass: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -43,13 +44,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const register = useCallback(async (name: string, email: string, pass: string) => {
+    const newUser = await apiService.register(name, email, pass);
+    // The service throws an error on failure, which is caught by the component.
+    // On success, we get a user object.
+    setUser(newUser);
+    sessionStorage.setItem('user', JSON.stringify(newUser));
+  }, []);
+
   const logout = useCallback(() => {
     setUser(null);
     sessionStorage.removeItem('user');
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

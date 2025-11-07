@@ -1,28 +1,29 @@
 import React, { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
+import { useAuth } from '../hooks/useAuth';
 
-const LoginPage: React.FC = () => {
-    const [email, setEmail] = useState('juan@test.com');
-    const [password, setPassword] = useState('1234');
+const RegisterPage: React.FC = () => {
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const auth = useAuth();
-    const navigate = useNavigate();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         try {
-            await auth.login(email, password);
-            toast.success('¡Bienvenido de nuevo!');
-            // La navegación se gestiona automáticamente en App.tsx al cambiar el estado del usuario
-        } catch (error) {
-            toast.error('Credenciales incorrectas. Inténtalo de nuevo.');
+            await auth.register(name, email, password);
+            toast.success('¡Registro completado! Bienvenido a ClubConnect.');
+            // La navegación ahora es gestionada por App.tsx, que redirigirá al usuario
+            // a la página principal al detectar el nuevo estado de 'user'.
+        } catch (error: any) {
+            toast.error(error.message || 'Error en el registro. Inténtalo de nuevo.');
         } finally {
             setIsLoading(false);
         }
@@ -35,9 +36,17 @@ const LoginPage: React.FC = () => {
             className="flex justify-center items-center py-12"
         >
             <Card className="w-full max-w-md">
-                <h1 className="text-2xl font-bold text-center mb-6">Iniciar Sesión</h1>
-                <p className="text-center text-sm text-muted mb-4">Usa <strong>juan@test.com</strong> / <strong>1234</strong> para jugador, o <strong>ana@test.com</strong> / <strong>1234</strong> para admin.</p>
+                <h1 className="text-2xl font-bold text-center mb-6">Crear una Cuenta</h1>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                     <Input 
+                        label="Nombre completo" 
+                        id="name" 
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                        placeholder="Juan Pérez"
+                    />
                     <Input 
                         label="Email" 
                         id="email" 
@@ -57,13 +66,13 @@ const LoginPage: React.FC = () => {
                         placeholder="••••••••"
                     />
                     <Button type="submit" className="w-full" isLoading={isLoading}>
-                        Entrar
+                        Registrarse
                     </Button>
                 </form>
                 <p className="text-center text-sm text-muted mt-6">
-                    ¿No tienes una cuenta?{' '}
-                    <Link to="/register" className="font-semibold text-primary hover:underline">
-                        Regístrate aquí
+                    ¿Ya tienes una cuenta?{' '}
+                    <Link to="/login" className="font-semibold text-primary hover:underline">
+                        Inicia sesión aquí
                     </Link>
                 </p>
             </Card>
@@ -71,4 +80,4 @@ const LoginPage: React.FC = () => {
     );
 };
 
-export default LoginPage;
+export default RegisterPage;

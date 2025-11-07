@@ -1,169 +1,244 @@
-import { User, UserRole, Club, Court, Booking, TimeSlot, BookingStatus } from '../types';
-import { add, set, differenceInHours } from 'date-fns';
+import { User, Club, Court, Booking, TimeSlot } from '../types';
+import { add, format, eachMinuteOfInterval, startOfDay, isWithinInterval, addMinutes } from 'date-fns';
 
 // --- MOCK DATABASE ---
-const users: User[] = [
-  { id: 'user-1', name: 'Carlos Jugador', email: 'player@test.com', role: UserRole.Player },
-  { id: 'user-2', name: 'Ana Admin', email: 'admin@test.com', role: UserRole.Admin, clubId: 'club-1' },
+
+let users: User[] = [
+  { id: 'user-1', name: 'Juan Pérez', email: 'juan@test.com', role: 'PLAYER' },
+  { id: 'user-2', name: 'Ana García', email: 'ana@test.com', role: 'ADMIN', clubId: 'club-1' },
+  { id: 'user-3', name: 'Carlos Sánchez', email: 'carlos@test.com', role: 'SUPER_ADMIN' },
+  { id: 'user-4', name: 'Lucía Fernández', email: 'lucia@test.com', role: 'PLAYER' },
 ];
 
-const clubs: Club[] = [
-  { id: 'club-1', name: 'Padel Club Center', address: 'Calle Falsa 123, Madrid', sports: ['Pádel', 'Tenis'], logoUrl: 'https://picsum.photos/seed/club1/200' },
-  { id: 'club-2', name: 'SportZone Arena', address: 'Avenida Siempre Viva 742, Barcelona', sports: ['Fútbol Sala', 'Baloncesto'], logoUrl: 'https://picsum.photos/seed/club2/200' },
+let clubs: Club[] = [
+  { id: 'club-1', name: 'Club de Pádel El Bosque', sports: ['Pádel', 'Tenis'] },
+  { id: 'club-2', name: 'Polideportivo La Ciudad', sports: ['Tenis', 'Baloncesto'] },
 ];
 
-const courts: Court[] = [
-  { id: 'court-1', clubId: 'club-1', name: 'Pista Central (Cristal)', sport: 'Pádel', features: ['Cubierta', 'Iluminación LED'] },
-  { id: 'court-2', clubId: 'club-1', name: 'Pista 2', sport: 'Pádel', features: ['Iluminación LED'] },
-  { id: 'court-3', clubId: 'club-1', name: 'Pista de Tenis 1', sport: 'Tenis', features: ['Tierra Batida'] },
-  { id: 'court-4', clubId: 'club-2', name: 'Campo de Fútbol Sala', sport: 'Fútbol Sala', features: ['Cubierta'] },
+let courts: Court[] = [
+  { id: 'court-1', clubId: 'club-1', name: 'Pádel Central', sport: 'Pádel', features: ['Cubierta', 'Cristal', 'LED'] },
+  { id: 'court-2', clubId: 'club-1', name: 'Pádel Pista 2', sport: 'Pádel', features: ['Exterior', 'Cristal'] },
+  { id: 'court-3', clubId: 'club-1', name: 'Tenis Rápida', sport: 'Tenis', features: ['Pista Dura'] },
+  { id: 'court-4', clubId: 'club-2', name: 'Tenis Tierra Batida', sport: 'Tenis', features: ['Tierra Batida'] },
+  { id: 'court-5', clubId: 'club-2', name: 'Cancha Basket Principal', sport: 'Baloncesto', features: ['Cubierta', 'Parquet'] },
 ];
 
 let bookings: Booking[] = [
-  { id: 'booking-1', courtId: 'court-1', userId: 'user-1', startTime: set(new Date(), { hours: 18, minutes: 0, seconds: 0, milliseconds: 0 }), endTime: set(new Date(), { hours: 19, minutes: 0, seconds: 0, milliseconds: 0 }), totalPrice: 20, status: 'CONFIRMED' },
-  { id: 'booking-2', courtId: 'court-1', userId: 'user-2', startTime: set(new Date(), { hours: 19, minutes: 30, seconds: 0, milliseconds: 0 }), endTime: set(new Date(), { hours: 20, minutes: 30, seconds: 0, milliseconds: 0 }), totalPrice: 22, status: 'CONFIRMED' },
-  { id: 'booking-3', courtId: 'court-3', userId: 'user-1', startTime: add(new Date(), {days: -2, hours: -3}), endTime: add(new Date(), {days: -2, hours: -2}), totalPrice: 15, status: 'CONFIRMED' },
-  { id: 'booking-4', courtId: 'court-2', userId: 'user-1', startTime: add(new Date(), { hours: 4 }), endTime: add(new Date(), { hours: 5 }), totalPrice: 10, status: 'CONFIRMED' },
-  { id: 'booking-5', courtId: 'court-2', userId: 'user-1', startTime: add(new Date(), { days: 2 }), endTime: add(new Date(), { days: 2, hours: 1 }), totalPrice: 10, status: 'CONFIRMED' },
+  { 
+    id: 'booking-1', 
+    userId: 'user-1', 
+    courtId: 'court-1', 
+    clubId: 'club-1',
+    startTime: new Date(new Date().setHours(18, 0, 0, 0)),
+    endTime: new Date(new Date().setHours(19, 30, 0, 0)),
+    totalPrice: 24,
+    status: 'CONFIRMED',
+  },
+  { 
+    id: 'booking-2', 
+    userId: 'user-4', 
+    courtId: 'court-3',
+    clubId: 'club-1',
+    startTime: add(new Date(), { days: 2, hours: -2 }),
+    endTime: add(new Date(), { days: 2, hours: -1 }),
+    totalPrice: 15,
+    status: 'CONFIRMED',
+  },
+   { 
+    id: 'booking-3', 
+    userId: 'user-1', 
+    courtId: 'court-1', 
+    clubId: 'club-1',
+    startTime: add(new Date(), { hours: 1 }),
+    endTime: add(new Date(), { hours: 2, minutes: 30 }),
+    totalPrice: 24,
+    status: 'PENDING_CANCELLATION',
+  },
+  { 
+    id: 'booking-4', 
+    userId: 'user-1', 
+    courtId: 'court-2',
+    clubId: 'club-1',
+    startTime: add(new Date(), { days: -1 }),
+    endTime: add(new Date(), { days: -1, hours: 1 }),
+    totalPrice: 16,
+    status: 'CANCELLED',
+  },
 ];
-// --- END MOCK DATABASE ---
 
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+const simulate = <T>(data: T, delay = 500): Promise<T> => 
+  new Promise(resolve => setTimeout(() => resolve(JSON.parse(JSON.stringify(data))), delay));
+
+const simulateError = (message: string, delay = 500): Promise<any> =>
+  new Promise((_, reject) => setTimeout(() => reject(new Error(message)), delay));
+
+// --- API SERVICE ---
 
 export const apiService = {
   login: async (email: string, pass: string): Promise<User | null> => {
-    await delay(500);
+    console.log(`Login attempt for ${email}`);
     const user = users.find(u => u.email === email);
-    // In a real app, you'd check the password hash
-    return user || null;
+    // Dummy password check
+    if (user && pass === '1234') {
+        return simulate(user);
+    }
+    return simulate(null);
   },
 
-  getClubs: async (): Promise<Club[]> => {
-    await delay(500);
-    return clubs;
+  register: async (name: string, email: string, pass: string): Promise<User> => {
+    if (pass.length < 4) {
+      return simulateError('La contraseña debe tener al menos 4 caracteres.');
+    }
+    const existingUser = users.find(u => u.email === email);
+    if (existingUser) {
+        return simulateError('El email ya está en uso');
+    }
+    const newUser: User = {
+        id: `user-${Date.now()}`,
+        name,
+        email,
+        role: 'PLAYER', // Default role for new users
+    };
+    users.push(newUser);
+    console.log("New user registered:", newUser);
+    console.log("All users:", users);
+    return simulate(newUser);
   },
   
-  getCourtsByClub: async (clubId: string): Promise<Court[]> => {
-    await delay(300);
-    return courts.filter(c => c.clubId === clubId);
+  getClubs: async (): Promise<Club[]> => {
+    return simulate(clubs);
   },
 
-  getAvailability: async (clubId: string, sport: string, date: Date): Promise<{ court: Court, slots: TimeSlot[] }[]> => {
-    await delay(700);
+  getClubById: async(clubId: string): Promise<Club> => {
+      const club = clubs.find(c => c.id === clubId);
+      if(!club) return simulateError("Club no encontrado");
+      return simulate(club);
+  },
+
+  getCourtsByClub: async (clubId: string): Promise<Court[]> => {
+    const clubCourts = courts.filter(c => c.clubId === clubId);
+    return simulate(clubCourts);
+  },
+
+  getAvailability: async (clubId: string, sport: string, date: Date): Promise<{ court: Court; slots: TimeSlot[] }[]> => {
     const relevantCourts = courts.filter(c => c.clubId === clubId && c.sport === sport);
-    const clubBookings = bookings.filter(b => 
-        b.startTime.toDateString() === date.toDateString() && 
-        relevantCourts.some(c => c.id === b.courtId)
-    );
-
-    const availability = relevantCourts.map(court => {
-      const slots: TimeSlot[] = [];
-      for (let hour = 9; hour < 23; hour++) {
-        for (let minute = 0; minute < 60; minute += 30) {
-          const slotTime = set(date, { hours: hour, minutes: minute, seconds: 0, milliseconds: 0 });
-          const isBooked = clubBookings.some(b => 
-            b.courtId === court.id && 
-            slotTime >= b.startTime && 
-            slotTime < b.endTime &&
-            b.status !== 'CANCELLED'
-          );
-          
-          const price = (hour >= 18 && hour < 21) ? 12 : 8; // Dynamic pricing example
-
-          slots.push({
-            time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
-            available: !isBooked,
-            price: price,
-          });
-        }
-      }
-      return { court, slots };
+    const dayStart = startOfDay(date);
+    
+    const relevantBookings = bookings.filter(b => {
+        const bookingDate = startOfDay(new Date(b.startTime));
+        return b.clubId === clubId && bookingDate.getTime() === dayStart.getTime() && b.status !== 'CANCELLED';
     });
 
-    return availability;
-  },
+    const availability = relevantCourts.map(court => {
+        const slots: TimeSlot[] = [];
+        const timeIntervals = eachMinuteOfInterval(
+            { start: new Date(dayStart).setHours(9, 0, 0, 0), end: new Date(dayStart).setHours(22, 30, 0, 0) },
+            { step: 30 }
+        );
+        
+        for (const slotStart of timeIntervals) {
+            const isBooked = relevantBookings.some(b => 
+                b.courtId === court.id && isWithinInterval(slotStart, { start: new Date(b.startTime), end: addMinutes(new Date(b.endTime), -1) })
+            );
 
+            slots.push({
+                time: format(slotStart, 'HH:mm'),
+                available: !isBooked,
+                price: 8, // dummy price
+            });
+        }
+        return { court, slots };
+    });
+
+    return simulate(availability, 1000);
+  },
+  
   createBooking: async (userId: string, courtId: string, startTime: Date, endTime: Date, totalPrice: number): Promise<Booking> => {
-      await delay(1000);
+      const court = courts.find(c => c.id === courtId);
+      if(!court) return simulateError('Pista no encontrada');
       const newBooking: Booking = {
           id: `booking-${Date.now()}`,
           userId,
           courtId,
+          clubId: court.clubId,
           startTime,
           endTime,
           totalPrice,
-          status: 'CONFIRMED',
+          status: 'CONFIRMED'
       };
       bookings.push(newBooking);
-      return newBooking;
+      return simulate(newBooking);
   },
 
   getUserBookings: async (userId: string): Promise<(Booking & { court: Court, club: Club })[]> => {
-    await delay(600);
     const userBookings = bookings.filter(b => b.userId === userId);
-    return userBookings.map(b => {
-        const court = courts.find(c => c.id === b.courtId)!;
-        const club = clubs.find(c => c.id === court.clubId)!;
-        return { ...b, court, club };
-    }).sort((a,b) => b.startTime.getTime() - a.startTime.getTime());
+    const enrichedBookings = userBookings.map(booking => {
+        const court = courts.find(c => c.id === booking.courtId);
+        const club = clubs.find(c => c.id === court?.clubId);
+        return { ...booking, court, club };
+    }).filter(b => b.court && b.club) as (Booking & { court: Court, club: Club })[];
+    
+    return simulate(enrichedBookings.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()));
   },
   
-  getClubBookings: async (clubId: string, date: Date): Promise<(Booking & { court: Court, user: User })[]> => {
-    await delay(600);
-    const clubBookings = bookings.filter(b => {
-        const court = courts.find(c => c.id === b.courtId);
-        return court?.clubId === clubId && b.startTime.toDateString() === date.toDateString();
-    });
-    return clubBookings.map(b => {
-        const court = courts.find(c => c.id === b.courtId)!;
-        const user = users.find(u => u.id === b.userId)!;
-        return { ...b, court, user };
-    }).sort((a,b) => a.startTime.getTime() - b.startTime.getTime());
+  requestCancelBooking: async (bookingId: string): Promise<{message: string}> => {
+      const bookingIndex = bookings.findIndex(b => b.id === bookingId);
+      if (bookingIndex === -1) return simulateError('Reserva no encontrada');
+      
+      const booking = bookings[bookingIndex];
+      const hoursUntil = (new Date(booking.startTime).getTime() - new Date().getTime()) / (1000 * 60 * 60);
+
+      if (hoursUntil > 24) {
+          bookings[bookingIndex].status = 'CANCELLED';
+          return simulate({ message: 'Reserva cancelada con éxito.' });
+      } else {
+          bookings[bookingIndex].status = 'PENDING_CANCELLATION';
+          return simulate({ message: 'Solicitud de cancelación enviada. El club revisará tu petición.' });
+      }
   },
 
-  getAllClubBookings: async (clubId: string): Promise<(Booking & { court: Court, user: User })[]> => {
-    await delay(800);
-    const clubCourtsIds = courts.filter(c => c.clubId === clubId).map(c => c.id);
-    const clubBookings = bookings.filter(b => clubCourtsIds.includes(b.courtId) && b.status !== 'CANCELLED');
+  getAllClubBookings: async (clubId: string): Promise<(Booking & { court: Court; user: User; })[]> => {
+      const clubBookings = bookings.filter(b => b.clubId === clubId);
+      const enriched = clubBookings.map(b => {
+          const court = courts.find(c => c.id === b.courtId);
+          const user = users.find(u => u.id === b.userId);
+          return { ...b, court, user };
+      }).filter(b => b.court && b.user) as (Booking & { court: Court; user: User; })[];
 
-    return clubBookings.map(b => {
-        const court = courts.find(c => c.id === b.courtId)!;
-        const user = users.find(u => u.id === b.userId)!;
-        return { ...b, court, user };
-    }).sort((a,b) => a.startTime.getTime() - b.startTime.getTime());
+      return simulate(enriched.sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()));
   },
 
-  requestCancelBooking: async (bookingId: string): Promise<{ success: boolean, message: string, pending: boolean }> => {
-    await delay(500);
-    const booking = bookings.find(b => b.id === bookingId);
-    if (!booking) {
-        throw new Error('Reserva no encontrada');
-    }
-
-    const hoursUntilStart = differenceInHours(booking.startTime, new Date());
-
-    if (hoursUntilStart > 24) {
-        booking.status = 'CANCELLED';
-        return { success: true, message: 'Reserva cancelada con éxito.', pending: false };
-    } else {
-        booking.status = 'PENDING_CANCELLATION';
-        return { success: true, message: 'Solicitud de cancelación enviada al club para su aprobación.', pending: true };
-    }
-  },
-
-  approveCancellation: async (bookingId: string): Promise<Booking> => {
-      await delay(400);
+  approveCancellation: async (bookingId: string): Promise<void> => {
       const booking = bookings.find(b => b.id === bookingId);
-      if (!booking) throw new Error("Booking not found");
-      booking.status = 'CANCELLED';
-      return booking;
+      if(booking) {
+          booking.status = 'CANCELLED';
+      }
+      return simulate(undefined);
   },
 
-  rejectCancellation: async (bookingId: string): Promise<Booking> => {
-      await delay(400);
+  rejectCancellation: async (bookingId: string): Promise<void> => {
       const booking = bookings.find(b => b.id === bookingId);
-      if (!booking) throw new Error("Booking not found");
-      booking.status = 'CONFIRMED';
-      return booking;
+      if(booking) {
+          booking.status = 'CONFIRMED';
+      }
+      return simulate(undefined);
   },
+  
+  addCourt: async (clubId: string, name: string, sport: string, features: string[]): Promise<Court> => {
+      const newCourt: Court = {
+          id: `court-${Date.now()}`,
+          clubId,
+          name,
+          sport,
+          features
+      };
+      courts.push(newCourt);
+
+      const club = clubs.find(c => c.id === clubId);
+      if (club && !club.sports.includes(sport)) {
+          club.sports.push(sport);
+      }
+      return simulate(newCourt);
+  }
+
 };

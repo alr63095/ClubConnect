@@ -1,46 +1,42 @@
-export enum UserRole {
-  Admin = 'ADMIN',
-  Player = 'PLAYER',
-}
-
-export type BookingStatus = 'CONFIRMED' | 'PENDING_CANCELLATION' | 'CANCELLED';
+export type UserRole = 'PLAYER' | 'ADMIN' | 'SUPER_ADMIN';
 
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
-  clubId?: string; // Only for Admins
+  clubId?: string;
 }
 
 export interface Club {
   id: string;
   name: string;
-  address: string;
   sports: string[];
-  logoUrl: string;
 }
 
 export interface Court {
   id: string;
+  clubId: string;
   name: string;
   sport: string;
-  clubId: string;
-  features: string[]; // e.g., 'Cubierta', 'Iluminación LED'
+  features: string[];
 }
+
+export interface TimeSlot {
+  time: string; // e.g. "09:00"
+  available: boolean;
+  price: number;
+}
+
+export type BookingStatus = 'CONFIRMED' | 'PENDING_CANCELLATION' | 'CANCELLED';
 
 export interface Booking {
   id: string;
-  courtId: string;
   userId: string;
+  courtId: string;
+  clubId: string;
   startTime: Date;
   endTime: Date;
   totalPrice: number;
   status: BookingStatus;
-}
-
-export interface TimeSlot {
-    time: string;
-    available: boolean;
-    price: number;
 }
