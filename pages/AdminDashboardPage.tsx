@@ -6,7 +6,7 @@ import { apiService } from '../services/apiService';
 import Card from '../components/ui/Card';
 import Spinner from '../components/ui/Spinner';
 import { ICONS } from '../constants';
-import { Booking, Court, User } from '../types';
+import { Booking, Club, Court, User } from '../types';
 import { format, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import AdminCalendarView from '../components/AdminCalendarView';
@@ -31,19 +31,22 @@ const occupancyData = [
 
 
 const AdminDashboardPage: React.FC = () => {
-    const { user } = useAuth();
+    const { user, selectedClubId } = useAuth();
+    const [club, setClub] = useState<Club | null>(null);
     const [loading, setLoading] = useState(true);
     const [courts, setCourts] = useState<Court[]>([]);
     const [allBookings, setAllBookings] = useState<(Booking & { court: Court; user: User; })[]>([]);
     const [selectedDate, setSelectedDate] = useState(new Date());
 
     const fetchData = useCallback(async () => {
-        if (user?.clubId) {
+        if (selectedClubId) {
             setLoading(true);
             try {
-                const courtsData = await apiService.getCourtsByClub(user.clubId);
+                const clubData = await apiService.getClubById(selectedClubId);
+                setClub(clubData);
+                const courtsData = await apiService.getCourtsByClub(selectedClubId);
                 setCourts(courtsData);
-                const bookingsData = await apiService.getAllClubBookings(user.clubId);
+                const bookingsData = await apiService.getAllClubBookings(selectedClubId);
                 setAllBookings(bookingsData);
             } catch(e) {
                 toast.error("No se pudieron cargar los datos del panel.");
@@ -51,7 +54,7 @@ const AdminDashboardPage: React.FC = () => {
                 setLoading(false);
             }
         }
-    }, [user]);
+    }, [selectedClubId]);
 
     useEffect(() => {
         fetchData();
@@ -85,6 +88,8 @@ const AdminDashboardPage: React.FC = () => {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <h1 className="text-3xl font-bold">Panel de Administrador</h1>
+      <p className="text-muted -mt-4">Mostrando datos para: <strong>{club?.name}</strong></p>
+      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
             <h3 className="text-sm font-medium text-muted">Ingresos Hoy</h3>

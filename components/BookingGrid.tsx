@@ -37,7 +37,6 @@ const BookingGrid: React.FC<BookingGridProps> = ({ availability, onBook, isBooki
         }
       }
       
-      // Only one court can be booked at a time
       const newSelection = { [courtId]: newCourtSlots };
       return newSelection;
     });
@@ -68,6 +67,12 @@ const BookingGrid: React.FC<BookingGridProps> = ({ availability, onBook, isBooki
     }
   }
 
+  const timeHeaders = useMemo(() => {
+    if (availability.length === 0 || availability[0].slots.length === 0) return [];
+    // Create a representative set of headers from the first court
+    return availability[0].slots.map(slot => slot.time);
+  }, [availability]);
+
   return (
     <div>
         <div className="overflow-x-auto bg-surface rounded-lg shadow-lg">
@@ -75,8 +80,8 @@ const BookingGrid: React.FC<BookingGridProps> = ({ availability, onBook, isBooki
                 <thead className="bg-gray-50 sticky top-0">
                     <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">Pista</th>
-                        {availability[0]?.slots.slice(0, 10).map(slot => ( // Show first 5 hours
-                            <th key={slot.time} className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{slot.time}</th>
+                        {timeHeaders.map(time => (
+                            <th key={time} className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{time}</th>
                         ))}
                     </tr>
                 </thead>
@@ -84,7 +89,7 @@ const BookingGrid: React.FC<BookingGridProps> = ({ availability, onBook, isBooki
                     {availability.map(({ court, slots }) => (
                         <tr key={court.id}>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10">{court.name}</td>
-                            {slots.slice(0, 10).map(slot => {
+                            {slots.map(slot => {
                                 const isSelected = selectedSlots[court.id]?.includes(slot.time);
                                 return (
                                 <td key={slot.time} className="px-2 py-4 whitespace-nowrap">

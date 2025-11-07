@@ -14,15 +14,15 @@ import AdminCourtsPage from './pages/AdminCourtsPage';
 import ProfilePage from './pages/ProfilePage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import Spinner from './components/ui/Spinner';
+import ClubSelectionPage from './pages/ClubSelectionPage';
 
 interface ProtectedRouteProps {
-  // Fix: Changed `JSX.Element` to `React.ReactElement` to resolve "Cannot find namespace 'JSX'" error.
   children: React.ReactElement;
   roles?: string[];
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, roles }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, selectedClubId } = useAuth();
   
   if (loading) {
     return <div className="flex justify-center items-center h-screen"><Spinner /></div>;
@@ -32,8 +32,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, roles }) => {
     return <Navigate to="/login" replace />;
   }
   
+  if (user.role === 'ADMIN' && user.clubIds && user.clubIds.length > 1 && !selectedClubId) {
+      return <Navigate to="/select-club" replace />;
+  }
+  
   if (roles && !roles.includes(user.role)) {
-    // Redirect to a relevant page based on role if they try to access a wrong page
     if (user.role === 'ADMIN') return <Navigate to="/admin/dashboard" replace />;
     if (user.role === 'PLAYER') return <Navigate to="/" replace />;
     return <Navigate to="/" replace />;
@@ -43,10 +46,27 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, roles }) => {
 };
 
 const AppRoutes = () => {
-    const { user, loading } = useAuth();
+    const { user, loading, selectedClubId } = useAuth();
 
     if (loading) {
         return <div className="flex justify-center items-center h-screen"><Spinner /></div>;
+    }
+
+    const getInitialRedirect = () => {
+        if (!user) return <HomePage />;
+
+        switch(user.role) {
+            case 'ADMIN':
+                if (user.clubIds && user.clubIds.length > 1 && !selectedClubId) {
+                    return <Navigate to="/select-club" />;
+                }
+                return <Navigate to="/admin/dashboard" />;
+            case 'SUPER_ADMIN':
+                return <Navigate to="/superadmin" />;
+            case 'PLAYER':
+            default:
+                return <HomePage />;
+        }
     }
 
     return (
@@ -56,18 +76,18 @@ const AppRoutes = () => {
                 <Route path="/login" element={user ? <Navigate to="/" /> : <LoginPage />} />
                 <Route path="/register" element={user ? <Navigate to="/" /> : <RegisterPage />} />
 
+                {/* Main Route */}
+                <Route path="/" element={getInitialRedirect()} />
+                
                 {/* Player Routes */}
-                <Route path="/" element={
-                    user?.role === 'ADMIN' ? <Navigate to="/admin/dashboard" /> :
-                    user?.role === 'SUPER_ADMIN' ? <Navigate to="/superadmin" /> :
-                    <HomePage />
-                } />
+                <Route path="/home" element={<ProtectedRoute roles={['PLAYER']}><HomePage /></ProtectedRoute>} />
                 <Route path="/bookings" element={<ProtectedRoute roles={['PLAYER']}><PlayerBookingsPage /></ProtectedRoute>} />
 
                 {/* Common Protected Routes */}
                 <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
                 {/* Admin Routes */}
+                <Route path="/select-club" element={<ProtectedRoute roles={['ADMIN']}><ClubSelectionPage /></ProtectedRoute>} />
                 <Route path="/admin/dashboard" element={<ProtectedRoute roles={['ADMIN']}><AdminDashboardPage /></ProtectedRoute>} />
                 <Route path="/admin/courts" element={<ProtectedRoute roles={['ADMIN']}><AdminCourtsPage /></ProtectedRoute>} />
 

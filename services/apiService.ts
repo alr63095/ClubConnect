@@ -1,244 +1,278 @@
 import { User, Club, Court, Booking, TimeSlot } from '../types';
-import { add, format, eachMinuteOfInterval, startOfDay, isWithinInterval, addMinutes } from 'date-fns';
+import { add, format, eachMinuteOfInterval, set, areIntervalsOverlapping } from 'date-fns';
+
+// Helper to simulate async operations
+const simulate = <T>(data: T, delay = 500): Promise<T> => 
+  new Promise(resolve => setTimeout(() => {
+    // Deep clone the data to simulate receiving a fresh copy from an API
+    resolve(JSON.parse(JSON.stringify(data)));
+  }, delay));
 
 // --- MOCK DATABASE ---
 
 let users: User[] = [
   { id: 'user-1', name: 'Juan Pérez', email: 'juan@test.com', role: 'PLAYER' },
-  { id: 'user-2', name: 'Ana García', email: 'ana@test.com', role: 'ADMIN', clubId: 'club-1' },
-  { id: 'user-3', name: 'Carlos Sánchez', email: 'carlos@test.com', role: 'SUPER_ADMIN' },
-  { id: 'user-4', name: 'Lucía Fernández', email: 'lucia@test.com', role: 'PLAYER' },
+  { id: 'user-2', name: 'Ana García', email: 'ana@test.com', role: 'ADMIN', clubIds: ['club-1', 'club-2'] },
+  { id: 'user-3', name: 'Super Admin', email: 'super@test.com', role: 'SUPER_ADMIN' },
+  { id: 'user-4', name: 'Carlos Sanz', email: 'carlos@test.com', role: 'PLAYER' },
 ];
 
 let clubs: Club[] = [
-  { id: 'club-1', name: 'Club de Pádel El Bosque', sports: ['Pádel', 'Tenis'] },
-  { id: 'club-2', name: 'Polideportivo La Ciudad', sports: ['Tenis', 'Baloncesto'] },
+  { id: 'club-1', name: 'Club de Tenis y Pádel Montecarlo', sports: ['Tenis', 'Pádel'] },
+  { id: 'club-2', name: 'Polideportivo La Estación', sports: ['Pádel', 'Baloncesto'] },
 ];
 
 let courts: Court[] = [
-  { id: 'court-1', clubId: 'club-1', name: 'Pádel Central', sport: 'Pádel', features: ['Cubierta', 'Cristal', 'LED'] },
-  { id: 'court-2', clubId: 'club-1', name: 'Pádel Pista 2', sport: 'Pádel', features: ['Exterior', 'Cristal'] },
-  { id: 'court-3', clubId: 'club-1', name: 'Tenis Rápida', sport: 'Tenis', features: ['Pista Dura'] },
-  { id: 'court-4', clubId: 'club-2', name: 'Tenis Tierra Batida', sport: 'Tenis', features: ['Tierra Batida'] },
-  { id: 'court-5', clubId: 'club-2', name: 'Cancha Basket Principal', sport: 'Baloncesto', features: ['Cubierta', 'Parquet'] },
+    { 
+        id: 'court-1', clubId: 'club-1', name: 'Pista de Pádel 1', sport: 'Pádel', 
+        features: ['Cristal', 'Exterior'], openingTime: '09:00', closingTime: '23:00',
+        defaultPrice: 15, slotPrices: [{time: '20:00', price: 20}, {time: '20:30', price: 20}]
+    },
+    { 
+        id: 'court-2', clubId: 'club-1', name: 'Pista de Pádel 2', sport: 'Pádel', 
+        features: ['Muro', 'Exterior'], openingTime: '09:00', closingTime: '23:00',
+        defaultPrice: 12, slotPrices: []
+    },
+    { 
+        id: 'court-3', clubId: 'club-1', name: 'Pista de Tenis Central', sport: 'Tenis', 
+        features: ['Tierra Batida', 'Iluminación LED'], openingTime: '09:00', closingTime: '22:00',
+        defaultPrice: 25, slotPrices: []
+    },
+    { 
+        id: 'court-4', clubId: 'club-2', name: 'Pista de Pádel Indoor', sport: 'Pádel', 
+        features: ['Cristal', 'Indoor'], openingTime: '10:00', closingTime: '22:00',
+        defaultPrice: 18, slotPrices: []
+    },
+    { 
+        id: 'court-5', clubId: 'club-2', name: 'Cancha de Baloncesto', sport: 'Baloncesto', 
+        features: ['Parquet', 'Indoor'], openingTime: '10:00', closingTime: '21:00',
+        defaultPrice: 30, slotPrices: []
+    },
 ];
 
 let bookings: Booking[] = [
-  { 
-    id: 'booking-1', 
-    userId: 'user-1', 
-    courtId: 'court-1', 
-    clubId: 'club-1',
-    startTime: new Date(new Date().setHours(18, 0, 0, 0)),
-    endTime: new Date(new Date().setHours(19, 30, 0, 0)),
-    totalPrice: 24,
-    status: 'CONFIRMED',
-  },
-  { 
-    id: 'booking-2', 
-    userId: 'user-4', 
-    courtId: 'court-3',
-    clubId: 'club-1',
-    startTime: add(new Date(), { days: 2, hours: -2 }),
-    endTime: add(new Date(), { days: 2, hours: -1 }),
-    totalPrice: 15,
-    status: 'CONFIRMED',
-  },
-   { 
-    id: 'booking-3', 
-    userId: 'user-1', 
-    courtId: 'court-1', 
-    clubId: 'club-1',
-    startTime: add(new Date(), { hours: 1 }),
-    endTime: add(new Date(), { hours: 2, minutes: 30 }),
-    totalPrice: 24,
-    status: 'PENDING_CANCELLATION',
-  },
-  { 
-    id: 'booking-4', 
-    userId: 'user-1', 
-    courtId: 'court-2',
-    clubId: 'club-1',
-    startTime: add(new Date(), { days: -1 }),
-    endTime: add(new Date(), { days: -1, hours: 1 }),
-    totalPrice: 16,
-    status: 'CANCELLED',
-  },
+    {
+        id: 'booking-1', userId: 'user-1', courtId: 'court-1', clubId: 'club-1',
+        startTime: set(new Date(), { hours: 19, minutes: 0, seconds: 0, milliseconds: 0 }),
+        endTime: set(new Date(), { hours: 20, minutes: 30, seconds: 0, milliseconds: 0 }),
+        totalPrice: 35, status: 'CONFIRMED'
+    },
+    {
+        id: 'booking-2', userId: 'user-4', courtId: 'court-3', clubId: 'club-1',
+        startTime: add(new Date(), { days: -1, hours: 2 }),
+        endTime: add(new Date(), { days: -1, hours: 3, minutes: 30 }),
+        totalPrice: 50, status: 'CONFIRMED'
+    },
+    {
+        id: 'booking-3', userId: 'user-1', courtId: 'court-4', clubId: 'club-2',
+        startTime: add(new Date(), { days: 2, hours: 1 }),
+        endTime: add(new Date(), { days: 2, hours: 2, minutes: 30 }),
+        totalPrice: 27, status: 'PENDING_CANCELLATION'
+    },
 ];
 
-const simulate = <T>(data: T, delay = 500): Promise<T> => 
-  new Promise(resolve => setTimeout(() => resolve(JSON.parse(JSON.stringify(data))), delay));
-
-const simulateError = (message: string, delay = 500): Promise<any> =>
-  new Promise((_, reject) => setTimeout(() => reject(new Error(message)), delay));
-
-// --- API SERVICE ---
-
-export const apiService = {
-  login: async (email: string, pass: string): Promise<User | null> => {
-    console.log(`Login attempt for ${email}`);
+class ApiService {
+  async login(email: string, pass: string): Promise<User> {
+    console.log(`Attempting login for ${email}`);
     const user = users.find(u => u.email === email);
     // Dummy password check
     if (user && pass === '1234') {
-        return simulate(user);
+      return simulate(user);
     }
-    return simulate(null);
-  },
+    return Promise.reject('Invalid credentials');
+  }
 
-  register: async (name: string, email: string, pass: string): Promise<User> => {
-    if (pass.length < 4) {
-      return simulateError('La contraseña debe tener al menos 4 caracteres.');
-    }
-    const existingUser = users.find(u => u.email === email);
-    if (existingUser) {
-        return simulateError('El email ya está en uso');
+  async register(name: string, email: string, pass: string): Promise<User> {
+    if (users.some(u => u.email === email)) {
+      return Promise.reject('User with this email already exists');
     }
     const newUser: User = {
-        id: `user-${Date.now()}`,
-        name,
-        email,
-        role: 'PLAYER', // Default role for new users
+      id: `user-${Date.now()}`,
+      name,
+      email,
+      role: 'PLAYER',
     };
     users.push(newUser);
-    console.log("New user registered:", newUser);
-    console.log("All users:", users);
     return simulate(newUser);
-  },
-  
-  getClubs: async (): Promise<Club[]> => {
+  }
+
+  async getClubs(): Promise<Club[]> {
     return simulate(clubs);
-  },
+  }
+  
+  async getClubById(clubId: string): Promise<Club> {
+    const club = clubs.find(c => c.id === clubId);
+    if (!club) return Promise.reject('Club not found');
+    return simulate(club);
+  }
 
-  getClubById: async(clubId: string): Promise<Club> => {
-      const club = clubs.find(c => c.id === clubId);
-      if(!club) return simulateError("Club no encontrado");
-      return simulate(club);
-  },
+  async getClubsByIds(clubIds: string[]): Promise<Club[]> {
+    const foundClubs = clubs.filter(c => clubIds.includes(c.id));
+    return simulate(foundClubs);
+  }
 
-  getCourtsByClub: async (clubId: string): Promise<Court[]> => {
+  async getCourtsByClub(clubId: string): Promise<Court[]> {
     const clubCourts = courts.filter(c => c.clubId === clubId);
     return simulate(clubCourts);
-  },
+  }
 
-  getAvailability: async (clubId: string, sport: string, date: Date): Promise<{ court: Court; slots: TimeSlot[] }[]> => {
-    const relevantCourts = courts.filter(c => c.clubId === clubId && c.sport === sport);
-    const dayStart = startOfDay(date);
+  async getAvailability(clubId: string, sport: string, date: Date): Promise<{ court: Court; slots: TimeSlot[] }[]> {
+    const clubCourts = courts.filter(c => c.clubId === clubId && c.sport === sport);
+    const dayBookings = bookings.filter(b => 
+      b.clubId === clubId && 
+      new Date(b.startTime).toDateString() === date.toDateString() &&
+      b.status !== 'CANCELLED'
+    );
     
-    const relevantBookings = bookings.filter(b => {
-        const bookingDate = startOfDay(new Date(b.startTime));
-        return b.clubId === clubId && bookingDate.getTime() === dayStart.getTime() && b.status !== 'CANCELLED';
-    });
-
-    const availability = relevantCourts.map(court => {
+    const availability = clubCourts.map(court => {
         const slots: TimeSlot[] = [];
-        const timeIntervals = eachMinuteOfInterval(
-            { start: new Date(dayStart).setHours(9, 0, 0, 0), end: new Date(dayStart).setHours(22, 30, 0, 0) },
-            { step: 30 }
-        );
-        
-        for (const slotStart of timeIntervals) {
-            const isBooked = relevantBookings.some(b => 
-                b.courtId === court.id && isWithinInterval(slotStart, { start: new Date(b.startTime), end: addMinutes(new Date(b.endTime), -1) })
-            );
+        const [openH, openM] = court.openingTime.split(':').map(Number);
+        const [closeH, closeM] = court.closingTime.split(':').map(Number);
 
-            slots.push({
-                time: format(slotStart, 'HH:mm'),
-                available: !isBooked,
-                price: 8, // dummy price
-            });
-        }
+        const start = set(date, { hours: openH, minutes: openM, seconds: 0, milliseconds: 0 });
+        const end = set(date, { hours: closeH, minutes: closeM, seconds: 0, milliseconds: 0 });
+        
+        const courtBookings = dayBookings.filter(b => b.courtId === court.id);
+
+        eachMinuteOfInterval({ start, end }, { step: 30 }).forEach(slotStart => {
+            if (slotStart < end) { // Don't create a slot at the exact closing time
+                const slotEnd = add(slotStart, { minutes: 30 });
+                const time = format(slotStart, 'HH:mm');
+
+                const isBooked = courtBookings.some(booking => 
+                    areIntervalsOverlapping(
+                        { start: slotStart, end: slotEnd },
+                        { start: new Date(booking.startTime), end: new Date(booking.endTime) },
+                        { inclusive: false }
+                    )
+                );
+                
+                const customPrice = court.slotPrices.find(p => p.time === time);
+
+                slots.push({
+                    time,
+                    available: !isBooked,
+                    price: customPrice ? customPrice.price : court.defaultPrice,
+                });
+            }
+        });
+
         return { court, slots };
     });
 
-    return simulate(availability, 1000);
-  },
-  
-  createBooking: async (userId: string, courtId: string, startTime: Date, endTime: Date, totalPrice: number): Promise<Booking> => {
-      const court = courts.find(c => c.id === courtId);
-      if(!court) return simulateError('Pista no encontrada');
-      const newBooking: Booking = {
-          id: `booking-${Date.now()}`,
-          userId,
-          courtId,
-          clubId: court.clubId,
-          startTime,
-          endTime,
-          totalPrice,
-          status: 'CONFIRMED'
-      };
-      bookings.push(newBooking);
-      return simulate(newBooking);
-  },
-
-  getUserBookings: async (userId: string): Promise<(Booking & { court: Court, club: Club })[]> => {
-    const userBookings = bookings.filter(b => b.userId === userId);
-    const enrichedBookings = userBookings.map(booking => {
-        const court = courts.find(c => c.id === booking.courtId);
-        const club = clubs.find(c => c.id === court?.clubId);
-        return { ...booking, court, club };
-    }).filter(b => b.court && b.club) as (Booking & { court: Court, club: Club })[];
-    
-    return simulate(enrichedBookings.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()));
-  },
-  
-  requestCancelBooking: async (bookingId: string): Promise<{message: string}> => {
-      const bookingIndex = bookings.findIndex(b => b.id === bookingId);
-      if (bookingIndex === -1) return simulateError('Reserva no encontrada');
-      
-      const booking = bookings[bookingIndex];
-      const hoursUntil = (new Date(booking.startTime).getTime() - new Date().getTime()) / (1000 * 60 * 60);
-
-      if (hoursUntil > 24) {
-          bookings[bookingIndex].status = 'CANCELLED';
-          return simulate({ message: 'Reserva cancelada con éxito.' });
-      } else {
-          bookings[bookingIndex].status = 'PENDING_CANCELLATION';
-          return simulate({ message: 'Solicitud de cancelación enviada. El club revisará tu petición.' });
-      }
-  },
-
-  getAllClubBookings: async (clubId: string): Promise<(Booking & { court: Court; user: User; })[]> => {
-      const clubBookings = bookings.filter(b => b.clubId === clubId);
-      const enriched = clubBookings.map(b => {
-          const court = courts.find(c => c.id === b.courtId);
-          const user = users.find(u => u.id === b.userId);
-          return { ...b, court, user };
-      }).filter(b => b.court && b.user) as (Booking & { court: Court; user: User; })[];
-
-      return simulate(enriched.sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()));
-  },
-
-  approveCancellation: async (bookingId: string): Promise<void> => {
-      const booking = bookings.find(b => b.id === bookingId);
-      if(booking) {
-          booking.status = 'CANCELLED';
-      }
-      return simulate(undefined);
-  },
-
-  rejectCancellation: async (bookingId: string): Promise<void> => {
-      const booking = bookings.find(b => b.id === bookingId);
-      if(booking) {
-          booking.status = 'CONFIRMED';
-      }
-      return simulate(undefined);
-  },
-  
-  addCourt: async (clubId: string, name: string, sport: string, features: string[]): Promise<Court> => {
-      const newCourt: Court = {
-          id: `court-${Date.now()}`,
-          clubId,
-          name,
-          sport,
-          features
-      };
-      courts.push(newCourt);
-
-      const club = clubs.find(c => c.id === clubId);
-      if (club && !club.sports.includes(sport)) {
-          club.sports.push(sport);
-      }
-      return simulate(newCourt);
+    return simulate(availability);
   }
 
-};
+  async createBooking(userId: string, courtId: string, startTime: Date, endTime: Date, totalPrice: number): Promise<Booking> {
+    const court = courts.find(c => c.id === courtId);
+    if (!court) return Promise.reject("Court not found");
+
+    const newBooking: Booking = {
+        id: `booking-${Date.now()}`,
+        userId,
+        courtId,
+        clubId: court.clubId,
+        startTime,
+        endTime,
+        totalPrice,
+        status: 'CONFIRMED'
+    };
+    bookings.push(newBooking);
+    return simulate(newBooking);
+  }
+
+  async getUserBookings(userId: string): Promise<(Booking & { court: Court, club: Club })[]> {
+    const userBookings = bookings.filter(b => b.userId === userId);
+    const enrichedBookings = userBookings.map(booking => {
+        const court = courts.find(c => c.id === booking.courtId)!;
+        const club = clubs.find(c => c.id === court.clubId)!;
+        return { ...booking, court, club };
+    }).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+    return simulate(enrichedBookings);
+  }
+
+  async requestCancelBooking(bookingId: string): Promise<{ message: string }> {
+    const booking = bookings.find(b => b.id === bookingId);
+    if (!booking) return Promise.reject({ message: 'Reserva no encontrada.' });
+
+    const hoursUntilBooking = (new Date(booking.startTime).getTime() - new Date().getTime()) / (1000 * 60 * 60);
+
+    if (hoursUntilBooking > 24) {
+        booking.status = 'CANCELLED';
+        return simulate({ message: 'Reserva cancelada correctamente.' });
+    } else {
+        booking.status = 'PENDING_CANCELLATION';
+        return simulate({ message: 'Solicitud de cancelación enviada al club.' });
+    }
+  }
+
+  async createCourt(courtData: Omit<Court, 'id'>): Promise<Court> {
+    const newCourt: Court = {
+        id: `court-${Date.now()}`,
+        ...courtData
+    };
+    courts.push(newCourt);
+    
+    const club = clubs.find(c => c.id === courtData.clubId);
+    if (club && !club.sports.includes(courtData.sport)) {
+        club.sports.push(courtData.sport);
+    }
+    
+    return simulate(newCourt);
+  }
+
+  async updateCourt(courtData: Court): Promise<Court> {
+    const index = courts.findIndex(c => c.id === courtData.id);
+    if (index === -1) return Promise.reject("Court not found");
+
+    courts[index] = courtData;
+    
+    const club = clubs.find(c => c.id === courtData.clubId);
+    if (club && !club.sports.includes(courtData.sport)) {
+        club.sports.push(courtData.sport);
+    }
+
+    return simulate(courts[index]);
+  }
+
+  async deleteCourt(courtId: string): Promise<void> {
+    courts = courts.filter(c => c.id !== courtId);
+    bookings.forEach(booking => {
+        if (booking.courtId === courtId && new Date(booking.startTime) > new Date()) {
+            booking.status = 'CANCELLED';
+        }
+    });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return;
+  }
+
+  async getAllClubBookings(clubId: string): Promise<(Booking & { court: Court, user: User })[]> {
+    const clubBookings = bookings.filter(b => b.clubId === clubId);
+    const enrichedBookings = clubBookings.map(booking => {
+        const court = courts.find(c => c.id === booking.courtId)!;
+        const user = users.find(u => u.id === booking.userId)!;
+        return { ...booking, court, user, startTime: new Date(booking.startTime), endTime: new Date(booking.endTime) };
+    }).sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+    return simulate(enrichedBookings);
+  }
+
+  async approveCancellation(bookingId: string): Promise<void> {
+    const booking = bookings.find(b => b.id === bookingId);
+    if (booking) {
+        booking.status = 'CANCELLED';
+    }
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return;
+  }
+
+  async rejectCancellation(bookingId: string): Promise<void> {
+    const booking = bookings.find(b => b.id === bookingId);
+    if (booking) {
+        booking.status = 'CONFIRMED';
+    }
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return;
+  }
+}
+
+export const apiService = new ApiService();

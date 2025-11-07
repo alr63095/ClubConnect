@@ -1,8 +1,68 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ICONS } from '../../constants';
 import Button from '../ui/Button';
+import { Club } from '../../types';
+import { apiService } from '../../services/apiService';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const ClubSwitcher: React.FC = () => {
+    const { user, selectedClubId, selectClub } = useAuth();
+    const [userClubs, setUserClubs] = useState<Club[]>([]);
+    const [isOpen, setIsOpen] = useState(false);
+
+    useEffect(() => {
+        if (user?.role === 'ADMIN' && user.clubIds) {
+            apiService.getClubsByIds(user.clubIds).then(setUserClubs);
+        }
+    }, [user]);
+    
+    const selectedClub = userClubs.find(c => c.id === selectedClubId);
+    if (!user || user.role !== 'ADMIN' || !user.clubIds || user.clubIds.length <= 1) {
+        return null;
+    }
+
+    return (
+        <div className="relative">
+            <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-gray-100 hover:bg-gray-200 transition-colors"
+            >
+                <span>{selectedClub?.name || 'Seleccionar Club'}</span>
+                <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute right-0 mt-2 w-56 bg-surface rounded-md shadow-lg z-50 overflow-hidden border"
+                    >
+                        <ul>
+                            {userClubs.map(club => (
+                                <li key={club.id}>
+                                    <a
+                                        href="#"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            selectClub(club.id);
+                                            setIsOpen(false);
+                                        }}
+                                        className={`block px-4 py-2 text-sm ${selectedClubId === club.id ? 'font-bold text-primary bg-teal-50' : 'text-text hover:bg-gray-100'}`}
+                                    >
+                                        {club.name}
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -30,7 +90,7 @@ const Header: React.FC = () => {
                 <>
                     {user.role === 'PLAYER' && (
                         <>
-                            <NavLink to="/" className={getNavLinkClass}>
+                            <NavLink to="/home" className={getNavLinkClass}>
                                 {ICONS.DASHBOARD} Reservar
                             </NavLink>
                             <NavLink to="/bookings" className={getNavLinkClass}>
@@ -56,6 +116,7 @@ const Header: React.FC = () => {
                         </>
                     )}
                     <div className="flex items-center gap-4 ml-4">
+                        <ClubSwitcher />
                         <NavLink to="/profile" className={getNavLinkClass}>
                             {ICONS.PROFILE} Perfil
                         </NavLink>

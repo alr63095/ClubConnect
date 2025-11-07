@@ -5,7 +5,7 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
-  clubId?: string;
+  clubIds?: string[]; // Un admin puede gestionar varios clubs
 }
 
 export interface Club {
@@ -20,6 +20,11 @@ export interface Court {
   name: string;
   sport: string;
   features: string[];
+  // Nuevos campos para horarios y precios personalizados
+  openingTime: string; // "HH:mm" e.g., "09:00"
+  closingTime: string; // "HH:mm" e.g., "23:00"
+  defaultPrice: number;
+  slotPrices: { time: string; price: number }[];
 }
 
 export interface TimeSlot {

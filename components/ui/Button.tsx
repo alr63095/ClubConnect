@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 // Fix: Import HTMLMotionProps to correctly type the props for a motion component.
 import { motion, HTMLMotionProps } from 'framer-motion';
@@ -8,7 +6,7 @@ import { motion, HTMLMotionProps } from 'framer-motion';
 // Fix: Changed props to extend HTMLMotionProps<'button'> to be compatible with framer-motion's motion.button component.
 // This resolves the type error on props like 'onDrag'.
 type ButtonProps = HTMLMotionProps<'button'> & {
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;
   isLoading?: boolean;
@@ -23,6 +21,7 @@ const Button: React.FC<ButtonProps> = ({ children, variant = 'primary', size = '
     primary: 'bg-primary text-white hover:bg-primary-dark focus:ring-primary',
     secondary: 'bg-secondary text-white hover:bg-secondary-dark focus:ring-secondary',
     ghost: 'bg-transparent text-primary hover:bg-teal-50 focus:ring-primary',
+    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
   };
 
   // Fix: Added size-specific classes.
