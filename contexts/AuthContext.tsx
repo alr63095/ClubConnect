@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { User } from '../types';
 import { apiService } from '../services/apiService';
@@ -8,7 +7,7 @@ interface AuthContextType {
   loading: boolean;
   selectedClubId: string | null;
   selectClub: (clubId: string) => void;
-  login: (email: string, pass: string) => Promise<void>;
+  login: (email: string, pass: string) => Promise<User>;
   register: (name: string, email: string, pass: string) => Promise<void>;
   logout: () => void;
 }
@@ -21,23 +20,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkSession = async () => {
+    const checkSession = () => {
         try {
             const storedUser = sessionStorage.getItem('user');
-            if(storedUser) {
+            // Proactively check for the literal string "undefined" which is invalid JSON and causes a crash.
+            if (storedUser && storedUser !== 'undefined') {
                 const sessionUser = JSON.parse(storedUser);
                 setUser(sessionUser);
                 const storedClubId = sessionStorage.getItem('selectedClubId');
                 if (storedClubId) {
                     setSelectedClubId(storedClubId);
-                } else if (sessionUser.role === 'ADMIN' && sessionUser.clubIds?.length === 1) {
-                    // Auto-select if admin only has one club
-                    setSelectedClubId(sessionUser.clubIds[0]);
-                    sessionStorage.setItem('selectedClubId', sessionUser.clubIds[0]);
+                } else if (sessionUser.role === 'ADMIN' && sessionUser.clubIds && sessionUser.clubIds.length > 0) {
+                    const defaultClubId = sessionUser.clubIds[0];
+                    setSelectedClubId(defaultClubId);
+                    sessionStorage.setItem('selectedClubId', defaultClubId);
                 }
+            } else {
+                // If storedUser is null or the invalid string "undefined", ensure session is clean.
+                sessionStorage.removeItem('user');
+                sessionStorage.removeItem('selectedClubId');
             }
         } catch (error) {
-            console.error('Failed to check session:', error);
+            console.error('Failed to parse user from session storage. Clearing session.', error);
+            // Clear corrupted data and reset state
+            sessionStorage.removeItem('user');
+            sessionStorage.removeItem('selectedClubId');
+            setUser(null);
+            setSelectedClubId(null);
         } finally {
             setLoading(false);
         }
@@ -50,19 +59,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.setItem('selectedClubId', clubId);
   }, []);
 
-  const login = useCallback(async (email: string, pass: string) => {
+  const login = useCallback(async (email: string, pass: string): Promise<User> => {
     const loggedInUser = await apiService.login(email, pass);
     if (loggedInUser) {
       setUser(loggedInUser);
       sessionStorage.setItem('user', JSON.stringify(loggedInUser));
 
-      if (loggedInUser.role === 'ADMIN' && loggedInUser.clubIds?.length === 1) {
+      if (loggedInUser.role === 'ADMIN' && loggedInUser.clubIds && loggedInUser.clubIds.length > 0) {
+        // Auto-select first club for any admin upon login
         selectClub(loggedInUser.clubIds[0]);
       } else {
-        // Will require user to select a club if they have more than one
         setSelectedClubId(null);
         sessionStorage.removeItem('selectedClubId');
       }
+      return loggedInUser;
     } else {
         throw new Error('Credenciales incorrectas');
     }

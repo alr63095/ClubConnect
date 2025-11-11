@@ -119,7 +119,7 @@ const CourtForm: React.FC<{
             
             <div>
                 <label htmlFor="sport" className="block text-sm font-medium text-muted mb-1">Deporte</label>
-                <select name="sport" id="sport" value={formData.sport} onChange={handleChange} className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm">
+                <select name="sport" id="sport" value={formData.sport} onChange={handleChange} className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm bg-white text-text">
                     <option value="">Selecciona un deporte</option>
                     {existingSports.map(s => <option key={s} value={s}>{s}</option>)}
                     <option value="new">Añadir nuevo deporte...</option>

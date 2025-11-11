@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Booking, Club, Court } from '../types';
+import { EnrichedBooking } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { apiService } from '../services/apiService';
 import Card from '../components/ui/Card';
@@ -11,11 +11,83 @@ import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
 import Modal from '../components/ui/Modal';
 
-const BookingItem: React.FC<{booking: Booking & { court: Court, club: Club }, onCancel: (bookingId: string) => void}> = ({booking, onCancel}) => {
+const PublishBookingModal: React.FC<{
+    booking: EnrichedBooking | null;
+    onClose: () => void;
+    onPublished: () => void;
+}> = ({ booking, onClose, onPublished }) => {
+    const [playersNeeded, setPlayersNeeded] = useState(1);
+    const [skillLevel, setSkillLevel] = useState(3);
+    const [isPublishing, setIsPublishing] = useState(false);
+
+    useEffect(() => {
+        // Reset form when a new booking is selected
+        if (booking) {
+            setPlayersNeeded(1);
+            setSkillLevel(3);
+        }
+    }, [booking]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!booking) return;
+
+        setIsPublishing(true);
+        try {
+            await apiService.publishBookingToForum(booking.id, playersNeeded, skillLevel);
+            toast.success('¡Partida publicada en el foro!');
+            onPublished();
+        } catch (error) {
+            toast.error('No se pudo publicar la partida.');
+        } finally {
+            setIsPublishing(false);
+        }
+    };
+
+    if (!booking) return null;
+
+    return (
+        <Modal isOpen={!!booking} onClose={onClose} title="Publicar Partida en el Foro">
+            <p className="text-muted mb-4">Completa los detalles para encontrar jugadores.</p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label htmlFor="playersNeeded" className="block text-sm font-medium text-muted mb-1">Jugadores que buscas</label>
+                    <select id="playersNeeded" value={playersNeeded} onChange={e => setPlayersNeeded(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm bg-white text-text">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                </div>
+                 <div>
+                    <label htmlFor="skillLevel" className="block text-sm font-medium text-muted mb-1">Nivel de habilidad buscado (1-5)</label>
+                    <select id="skillLevel" value={skillLevel} onChange={e => setSkillLevel(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm bg-white text-text">
+                        <option value="1">1 (Principiante)</option>
+                        <option value="2">2 (Ocasional)</option>
+                        <option value="3">3 (Intermedio)</option>
+                        <option value="4">4 (Avanzado)</option>
+                        <option value="5">5 (Competición)</option>
+                    </select>
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                    <Button variant="ghost" type="button" onClick={onClose}>Cancelar</Button>
+                    <Button type="submit" isLoading={isPublishing}>Publicar</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+
+const BookingItem: React.FC<{
+    booking: EnrichedBooking, 
+    onCancel: (bookingId: string) => void,
+    onPublish: (booking: EnrichedBooking) => void,
+}> = ({booking, onCancel, onPublish}) => {
     const isPast = new Date(booking.startTime) < new Date();
     const canCancel = !isPast && booking.status === 'CONFIRMED';
     const cancellationPending = booking.status === 'PENDING_CANCELLATION';
     const isCancelled = booking.status === 'CANCELLED';
+    const canPublish = !isPast && booking.status === 'CONFIRMED' && !booking.playersNeeded;
+    const isPublished = !isPast && booking.status === 'CONFIRMED' && booking.playersNeeded;
+
 
     const getStatusChip = () => {
         if (cancellationPending) {
@@ -31,21 +103,29 @@ const BookingItem: React.FC<{booking: Booking & { court: Court, club: Club }, on
         <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className={`p-4 rounded-lg flex items-start gap-4 ${isPast || isCancelled ? 'bg-slate-50' : 'bg-teal-50'}`}
+            className={`p-4 rounded-lg flex flex-col gap-4 ${isPast || isCancelled ? 'bg-slate-50' : 'bg-teal-50'}`}
         >
-            <div className={`p-3 rounded-full ${isPast || isCancelled ? 'bg-slate-200 text-slate-600' : 'bg-primary-light text-primary-dark'}`}>
-                {isPast || isCancelled ? '✓' : '◷'}
-            </div>
-            <div className="flex-grow">
-                <p className={`font-bold ${isPast || isCancelled ? 'text-muted' : 'text-text'}`}>{booking.court.name} - {booking.court.sport}</p>
-                <p className="text-sm text-muted">{booking.club.name}</p>
-                <p className="text-sm text-muted">{format(new Date(booking.startTime), "eeee, d 'de' MMMM 'de' yyyy", { locale: es })}</p>
-                <p className="text-sm text-muted">{format(new Date(booking.startTime), 'HH:mm')} - {format(new Date(booking.endTime), 'HH:mm')}</p>
-                <div className="flex items-center gap-2 mt-1">{getStatusChip()}</div>
-            </div>
-            <div className="text-right">
-                <p className={`font-bold text-lg ${isPast || isCancelled ? 'text-muted' : 'text-primary'}`}>{booking.totalPrice}€</p>
-                {canCancel && <Button variant="ghost" size="sm" className="mt-1 text-red-600 hover:bg-red-50" onClick={() => onCancel(booking.id)}>Cancelar</Button>}
+            <div className="flex items-start gap-4">
+                <div className={`mt-1 p-3 rounded-full ${isPast || isCancelled ? 'bg-slate-200 text-slate-600' : 'bg-primary-light text-primary-dark'}`}>
+                    {isPast || isCancelled ? '✓' : '◷'}
+                </div>
+                <div className="flex-grow">
+                    <p className={`font-bold ${isPast || isCancelled ? 'text-muted' : 'text-text'}`}>{booking.court.name} - {booking.court.sport}</p>
+                    <p className="text-sm text-muted">{booking.club.name}</p>
+                    <p className="text-sm text-muted">{format(new Date(booking.startTime), "eeee, d 'de' MMMM 'de' yyyy", { locale: es })}</p>
+                    <p className="text-sm text-muted">{format(new Date(booking.startTime), 'HH:mm')} - {format(new Date(booking.endTime), 'HH:mm')}</p>
+                    <div className="flex items-center gap-2 mt-1">{getStatusChip()}</div>
+                    {isPublished && (
+                        <div className="mt-2 text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-md inline-block font-medium">
+                            Publicada en foro: Buscando {booking.playersNeeded} (Nivel {booking.skillLevel})
+                        </div>
+                    )}
+                </div>
+                <div className="text-right flex flex-col items-end gap-1">
+                    <p className={`font-bold text-lg ${isPast || isCancelled ? 'text-muted' : 'text-primary'}`}>{booking.totalPrice}€</p>
+                    {canCancel && <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => onCancel(booking.id)}>Cancelar</Button>}
+                    {canPublish && <Button variant="secondary" size="sm" onClick={() => onPublish(booking)}>Buscar Jugadores</Button>}
+                </div>
             </div>
         </motion.div>
     )
@@ -53,10 +133,10 @@ const BookingItem: React.FC<{booking: Booking & { court: Court, club: Club }, on
 
 const PlayerBookingsPage: React.FC = () => {
     const { user } = useAuth();
-    const [bookings, setBookings] = useState<(Booking & { court: Court, club: Club })[]>([]);
+    const [bookings, setBookings] = useState<EnrichedBooking[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isCancelling, setIsCancelling] = useState(false);
-    const [bookingToCancel, setBookingToCancel] = useState<(Booking & { court: Court, club: Club }) | null>(null);
+    const [bookingToCancel, setBookingToCancel] = useState<EnrichedBooking | null>(null);
+    const [bookingToPublish, setBookingToPublish] = useState<EnrichedBooking | null>(null);
 
     const fetchBookings = useCallback(() => {
         if (user) {
@@ -81,15 +161,13 @@ const PlayerBookingsPage: React.FC = () => {
 
     const confirmCancellation = async () => {
         if (!bookingToCancel) return;
-        setIsCancelling(true);
         try {
             const { message } = await apiService.requestCancelBooking(bookingToCancel.id);
             toast.success(message);
-            fetchBookings(); // Re-fetch bookings to update the UI
+            fetchBookings();
         } catch (error: any) {
             toast.error(error.message || 'No se pudo procesar la cancelación.');
         } finally {
-            setIsCancelling(false);
             setBookingToCancel(null);
         }
     };
@@ -109,7 +187,7 @@ const PlayerBookingsPage: React.FC = () => {
                     <h2 className="text-xl font-bold mb-4">Próximas Reservas</h2>
                     {upcomingBookings.length > 0 ? (
                         <div className="space-y-4">
-                            {upcomingBookings.map(b => <BookingItem key={b.id} booking={b} onCancel={handleCancelRequest} />)}
+                            {upcomingBookings.map(b => <BookingItem key={b.id} booking={b} onCancel={handleCancelRequest} onPublish={setBookingToPublish} />)}
                         </div>
                     ) : (
                         <p className="text-muted">No tienes ninguna reserva próxima.</p>
@@ -119,13 +197,22 @@ const PlayerBookingsPage: React.FC = () => {
                     <h2 className="text-xl font-bold mb-4">Historial de Reservas</h2>
                      {pastBookings.length > 0 ? (
                         <div className="space-y-4">
-                            {pastBookings.map(b => <BookingItem key={b.id} booking={b} onCancel={handleCancelRequest} />)}
+                            {pastBookings.map(b => <BookingItem key={b.id} booking={b} onCancel={handleCancelRequest} onPublish={() => {}} />)}
                         </div>
                     ) : (
                         <p className="text-muted">Aún no has completado ninguna reserva.</p>
                     )}
                 </Card>
             </div>
+
+            <PublishBookingModal
+                booking={bookingToPublish}
+                onClose={() => setBookingToPublish(null)}
+                onPublished={() => {
+                    setBookingToPublish(null);
+                    fetchBookings();
+                }}
+            />
 
             <Modal isOpen={!!bookingToCancel} onClose={() => setBookingToCancel(null)} title="Confirmar Cancelación">
                 {bookingToCancel && (
@@ -139,7 +226,7 @@ const PlayerBookingsPage: React.FC = () => {
                         )}
                         <div className="flex justify-end gap-2 mt-6">
                             <Button variant="ghost" onClick={() => setBookingToCancel(null)}>Volver</Button>
-                            <Button className="bg-red-600 hover:bg-red-700 focus:ring-red-500" onClick={confirmCancellation} isLoading={isCancelling}>
+                            <Button className="bg-red-600 hover:bg-red-700 focus:ring-red-500" onClick={confirmCancellation}>
                                 Sí, Cancelar
                             </Button>
                         </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Club, Court, TimeSlot } from '../types';
+import { Club, Court, TimeSlot, Booking } from '../types';
 import { apiService } from '../services/apiService';
 import BookingGrid from '../components/BookingGrid';
 import Card from '../components/ui/Card';
@@ -10,13 +10,19 @@ import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 
+type GroupedAvailability = {
+    club: Club;
+    availability: { court: Court; slots: TimeSlot[] }[];
+};
+
 const HomePage: React.FC = () => {
   const { user } = useAuth();
   const [clubs, setClubs] = useState<Club[]>([]);
+  const [allSports, setAllSports] = useState<string[]>([]);
   const [selectedClub, setSelectedClub] = useState<Club | null>(null);
   const [selectedSport, setSelectedSport] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [availability, setAvailability] = useState<{ court: Court; slots: TimeSlot[] }[] | null>(null);
+  const [availability, setAvailability] = useState<GroupedAvailability[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
@@ -27,6 +33,8 @@ const HomePage: React.FC = () => {
       try {
         const clubsData = await apiService.getClubs();
         setClubs(clubsData);
+        const sports = new Set(clubsData.flatMap(c => c.sports));
+        setAllSports(Array.from(sports));
       } catch (error) {
         console.error("Error fetching clubs", error);
         toast.error("No se pudieron cargar los clubs.");
@@ -38,16 +46,25 @@ const HomePage: React.FC = () => {
   }, []);
 
   const fetchAvailability = async () => {
-    if (!selectedClub || !selectedSport || !selectedDate) {
-      toast.error('Por favor, completa todos los campos de búsqueda.');
+    if (!selectedSport || !selectedDate) {
+      toast.error('Por favor, selecciona un deporte y una fecha.');
       return;
     }
     setSearching(true);
     setAvailability(null);
     try {
         const localDate = new Date(selectedDate + 'T00:00:00');
-        const availabilityData = await apiService.getAvailability(selectedClub.id, selectedSport, localDate);
-        setAvailability(availabilityData);
+        if (selectedClub) {
+            const availabilityData = await apiService.getAvailability(selectedClub.id, selectedSport, localDate);
+            if (availabilityData.length > 0) {
+              setAvailability([{ club: selectedClub, availability: availabilityData }]);
+            } else {
+              setAvailability([]);
+            }
+        } else {
+            const globalAvailabilityData = await apiService.getGlobalAvailability(selectedSport, localDate);
+            setAvailability(globalAvailabilityData);
+        }
     } catch(error){
         toast.error("Error al buscar disponibilidad.");
     } finally {
@@ -77,8 +94,6 @@ const HomePage: React.FC = () => {
       await apiService.createBooking(user.id, courtId, startTime, endTime, totalPrice);
       
       toast.success(`¡Reserva confirmada!`);
-      
-      // Refresh availability
       await fetchAvailability();
 
     } catch (error) {
@@ -88,6 +103,16 @@ const HomePage: React.FC = () => {
       setIsBooking(false);
     }
   }
+
+  const handleClubChange = (clubId: string) => {
+      const club = clubs.find(c => c.id === clubId) || null;
+      setSelectedClub(club);
+      if (club && !club.sports.includes(selectedSport)) {
+          setSelectedSport('');
+      }
+  }
+
+  const sportsToShow = selectedClub ? selectedClub.sports : allSports;
 
   if (loading) return <Spinner />;
 
@@ -107,13 +132,10 @@ const HomePage: React.FC = () => {
                 <label className="block text-sm font-medium text-muted mb-1">Club</label>
                 <select 
                     value={selectedClub?.id || ''} 
-                    onChange={e => {
-                        setSelectedClub(clubs.find(c => c.id === e.target.value) || null);
-                        setSelectedSport('');
-                    }}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm"
+                    onChange={e => handleClubChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm bg-white text-text"
                 >
-                    <option value="">Selecciona un club</option>
+                    <option value="">Todos los clubs</option>
                     {clubs.map(club => <option key={club.id} value={club.id}>{club.name}</option>)}
                 </select>
             </div>
@@ -122,11 +144,10 @@ const HomePage: React.FC = () => {
                 <select
                     value={selectedSport}
                     onChange={e => setSelectedSport(e.target.value)}
-                    disabled={!selectedClub}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm bg-white text-text"
                 >
                     <option value="">Selecciona un deporte</option>
-                    {selectedClub?.sports.map(sport => <option key={sport} value={sport}>{sport}</option>)}
+                    {sportsToShow.map(sport => <option key={sport} value={sport}>{sport}</option>)}
                 </select>
             </div>
             <Input
@@ -143,14 +164,23 @@ const HomePage: React.FC = () => {
         {searching && <Spinner />}
 
         {availability && (
-            <Card>
+            <motion.div initial={{opacity: 0}} animate={{opacity: 1}}>
                 <h2 className="text-2xl font-bold mb-4">Pistas disponibles para {selectedSport} el {new Date(selectedDate+'T00:00:00').toLocaleDateString()}</h2>
                 {availability.length > 0 ? (
-                    <BookingGrid availability={availability} onBook={handleBook} isBooking={isBooking} />
+                    <div className="space-y-8">
+                        {availability.map(({ club, availability: clubAvailability }) => (
+                           <Card key={club.id}>
+                               <h3 className="text-xl font-bold mb-4 text-primary-dark">{club.name}</h3>
+                               <BookingGrid availability={clubAvailability} onBook={handleBook} isBooking={isBooking} />
+                           </Card>
+                        ))}
+                    </div>
                 ) : (
-                    <p className="text-center text-muted">No hay pistas disponibles para tu selección.</p>
+                    <Card className="text-center py-8">
+                      <p className="text-center text-muted">No hay pistas disponibles para tu selección.</p>
+                    </Card>
                 )}
-            </Card>
+            </motion.div>
         )}
     </motion.div>
   );

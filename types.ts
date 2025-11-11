@@ -6,6 +6,7 @@ export interface User {
   email: string;
   role: UserRole;
   clubIds?: string[]; // Un admin puede gestionar varios clubs
+  isBanned?: boolean;
 }
 
 export interface Club {
@@ -44,4 +45,20 @@ export interface Booking {
   endTime: Date;
   totalPrice: number;
   status: BookingStatus;
+  // For forum posts
+  playersNeeded?: number;
+  skillLevel?: number;
+  joinedPlayerIds?: string[];
+  pendingPlayerIds?: string[];
 }
+
+
+// Tipo enriquecido para usar en la UI
+export type EnrichedBooking = Booking & {
+  court: Court;
+  club: Club;
+  user: User; // El creador de la reserva
+  // Enriched for forum
+  joinedPlayers?: User[];
+  pendingPlayers?: User[];
+};

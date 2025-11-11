@@ -1,4 +1,4 @@
-import { User, Club, Court, Booking, TimeSlot } from '../types';
+import { User, Club, Court, Booking, TimeSlot, UserRole, EnrichedBooking } from '../types';
 import { add, format, eachMinuteOfInterval, set, areIntervalsOverlapping } from 'date-fns';
 
 // Helper to simulate async operations
@@ -11,10 +11,14 @@ const simulate = <T>(data: T, delay = 500): Promise<T> =>
 // --- MOCK DATABASE ---
 
 let users: User[] = [
-  { id: 'user-1', name: 'Juan Pérez', email: 'juan@test.com', role: 'PLAYER' },
-  { id: 'user-2', name: 'Ana García', email: 'ana@test.com', role: 'ADMIN', clubIds: ['club-1', 'club-2'] },
-  { id: 'user-3', name: 'Super Admin', email: 'super@test.com', role: 'SUPER_ADMIN' },
-  { id: 'user-4', name: 'Carlos Sanz', email: 'carlos@test.com', role: 'PLAYER' },
+  { id: 'user-1', name: 'Juan Pérez', email: 'juan@test.com', role: 'PLAYER', isBanned: false },
+  { id: 'user-2', name: 'Ana García', email: 'ana@test.com', role: 'ADMIN', clubIds: ['club-1', 'club-2'], isBanned: false },
+  { id: 'user-3', name: 'Super Admin', email: 'super@test.com', role: 'SUPER_ADMIN', isBanned: false },
+  { id: 'user-4', name: 'Carlos Sanz', email: 'carlos@test.com', role: 'PLAYER', isBanned: false },
+  { id: 'user-5', name: 'Lucía Martín', email: 'lucia@test.com', role: 'PLAYER', isBanned: true },
+  { id: 'user-6', name: 'Pedro Jiménez', email: 'pedro@test.com', role: 'ADMIN', clubIds: ['club-2'], isBanned: false },
+  { id: 'user-7', name: 'Sofía López', email: 'sofia@test.com', role: 'PLAYER', isBanned: false },
+  { id: 'user-8', name: 'Miguel Reyes', email: 'miguel@test.com', role: 'PLAYER', isBanned: false },
 ];
 
 let clubs: Club[] = [
@@ -69,13 +73,53 @@ let bookings: Booking[] = [
         endTime: add(new Date(), { days: 2, hours: 2, minutes: 30 }),
         totalPrice: 27, status: 'PENDING_CANCELLATION'
     },
+    {
+        id: 'booking-4', userId: 'user-7', courtId: 'court-2', clubId: 'club-1',
+        startTime: add(new Date(), { days: 1, hours: 4 }),
+        endTime: add(new Date(), { days: 1, hours: 5, minutes: 30 }),
+        totalPrice: 24, status: 'CONFIRMED',
+        playersNeeded: 3,
+        skillLevel: 3,
+        joinedPlayerIds: ['user-8'],
+        pendingPlayerIds: []
+    },
+    {
+        id: 'booking-5-forum', userId: 'user-4', courtId: 'court-5', clubId: 'club-2',
+        startTime: add(new Date(), { days: 3, hours: 5 }),
+        endTime: add(new Date(), { days: 3, hours: 6, minutes: 30 }),
+        totalPrice: 30, status: 'CONFIRMED',
+        playersNeeded: 4,
+        skillLevel: 4,
+        joinedPlayerIds: [],
+        pendingPlayerIds: ['user-1'],
+    },
 ];
 
 class ApiService {
+  private enrichBooking(booking: Booking): EnrichedBooking {
+      const court = courts.find(c => c.id === booking.courtId)!;
+      const club = clubs.find(c => c.id === court.clubId)!;
+      const user = users.find(u => u.id === booking.userId)!;
+      
+      const enriched: EnrichedBooking = { ...booking, court, club, user };
+      
+      if (booking.joinedPlayerIds) {
+          enriched.joinedPlayers = users.filter(u => booking.joinedPlayerIds!.includes(u.id));
+      }
+      if (booking.pendingPlayerIds) {
+          enriched.pendingPlayers = users.filter(u => booking.pendingPlayerIds!.includes(u.id));
+      }
+
+      return enriched;
+  }
+
   async login(email: string, pass: string): Promise<User> {
     console.log(`Attempting login for ${email}`);
     const user = users.find(u => u.email === email);
     // Dummy password check
+    if (user && user.isBanned) {
+        return Promise.reject('Este usuario ha sido baneado.');
+    }
     if (user && pass === '1234') {
       return simulate(user);
     }
@@ -94,6 +138,13 @@ class ApiService {
     };
     users.push(newUser);
     return simulate(newUser);
+  }
+
+  async requestPasswordReset(email: string): Promise<{ message: string }> {
+      console.log(`Password reset requested for ${email}`);
+      // We don't reveal if the user exists for security reasons.
+      // In a real app, this would trigger an email send process.
+      return simulate({ message: 'Password reset email sent.' });
   }
 
   async getClubs(): Promise<Club[]> {
@@ -133,6 +184,8 @@ class ApiService {
         const end = set(date, { hours: closeH, minutes: closeM, seconds: 0, milliseconds: 0 });
         
         const courtBookings = dayBookings.filter(b => b.courtId === court.id);
+        const now = new Date();
+        const isToday = new Date().toDateString() === date.toDateString();
 
         eachMinuteOfInterval({ start, end }, { step: 30 }).forEach(slotStart => {
             if (slotStart < end) { // Don't create a slot at the exact closing time
@@ -146,12 +199,14 @@ class ApiService {
                         { inclusive: false }
                     )
                 );
+
+                const isPast = isToday && slotStart < now;
                 
                 const customPrice = court.slotPrices.find(p => p.time === time);
 
                 slots.push({
                     time,
-                    available: !isBooked,
+                    available: !isBooked && !isPast,
                     price: customPrice ? customPrice.price : court.defaultPrice,
                 });
             }
@@ -161,6 +216,20 @@ class ApiService {
     });
 
     return simulate(availability);
+  }
+
+  async getGlobalAvailability(sport: string, date: Date): Promise<{ club: Club; availability: { court: Court; slots: TimeSlot[] }[] }[]> {
+    const relevantClubs = clubs.filter(c => c.sports.includes(sport));
+    if (relevantClubs.length === 0) return simulate([]);
+
+    const results = await Promise.all(
+        relevantClubs.map(async club => {
+            const availability = await this.getAvailability(club.id, sport, date);
+            return { club, availability };
+        })
+    );
+
+    return simulate(results.filter(r => r.availability.length > 0 && r.availability.some(a => a.slots.length > 0)));
   }
 
   async createBooking(userId: string, courtId: string, startTime: Date, endTime: Date, totalPrice: number): Promise<Booking> {
@@ -175,20 +244,69 @@ class ApiService {
         startTime,
         endTime,
         totalPrice,
-        status: 'CONFIRMED'
+        status: 'CONFIRMED',
     };
     bookings.push(newBooking);
     return simulate(newBooking);
   }
 
-  async getUserBookings(userId: string): Promise<(Booking & { court: Court, club: Club })[]> {
+  async getUserBookings(userId: string): Promise<EnrichedBooking[]> {
     const userBookings = bookings.filter(b => b.userId === userId);
-    const enrichedBookings = userBookings.map(booking => {
-        const court = courts.find(c => c.id === booking.courtId)!;
-        const club = clubs.find(c => c.id === court.clubId)!;
-        return { ...booking, court, club };
-    }).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+    const enrichedBookings = userBookings
+        .map(booking => this.enrichBooking(booking))
+        .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
     return simulate(enrichedBookings);
+  }
+
+  // Fix: Implement getForumPosts to return open, future bookings where players are needed.
+  async getForumPosts(): Promise<EnrichedBooking[]> {
+    const now = new Date();
+    // A "forum post" is a confirmed, future booking where the user is looking for players.
+    const forumBookings = bookings.filter(b => 
+        b.playersNeeded && b.playersNeeded > 0 &&
+        new Date(b.startTime) > now &&
+        b.status === 'CONFIRMED'
+    );
+    
+    const enriched = forumBookings.map(b => this.enrichBooking(b));
+    
+    return simulate(enriched);
+  }
+  
+  async publishBookingToForum(bookingId: string, playersNeeded: number, skillLevel: number): Promise<Booking> {
+      const booking = bookings.find(b => b.id === bookingId);
+      if (!booking) return Promise.reject({ message: 'Reserva no encontrada.' });
+
+      booking.playersNeeded = playersNeeded;
+      booking.skillLevel = skillLevel;
+
+      return simulate(booking);
+  }
+
+  // Fix: Implement requestToJoinBooking to allow users to request to join a forum post.
+  async requestToJoinBooking(bookingId: string, userId: string): Promise<{ message: string }> {
+      const booking = bookings.find(b => b.id === bookingId);
+      if (!booking) return Promise.reject({ message: 'Partida no encontrada.' });
+      if (booking.userId === userId) return Promise.reject({ message: 'No puedes unirte a tu propia partida.' });
+      
+      const pending = booking.pendingPlayerIds || [];
+      const joined = booking.joinedPlayerIds || [];
+
+      if (pending.includes(userId) || joined.includes(userId)) {
+          return Promise.reject({ message: 'Ya has solicitado unirte o ya eres parte de esta partida.' });
+      }
+
+      const spotsFilled = joined.length;
+      if (spotsFilled >= booking.playersNeeded!) {
+          return Promise.reject({ message: 'Esta partida ya está completa.' });
+      }
+      
+      if (!booking.pendingPlayerIds) {
+          booking.pendingPlayerIds = [];
+      }
+      booking.pendingPlayerIds.push(userId);
+      
+      return simulate({ message: 'Solicitud para unirse enviada.' });
   }
 
   async requestCancelBooking(bookingId: string): Promise<{ message: string }> {
@@ -273,6 +391,114 @@ class ApiService {
     await new Promise(resolve => setTimeout(resolve, 500));
     return;
   }
+  
+  // --- SUPER ADMIN METHODS ---
+  async getAllUsers(): Promise<User[]> {
+      return simulate(users);
+  }
+
+  async getAdmins(): Promise<User[]> {
+      const admins = users.filter(u => u.role === 'ADMIN');
+      return simulate(admins);
+  }
+
+  async createUser(userData: Omit<User, 'id'>): Promise<User> {
+    if (users.some(u => u.email === userData.email)) {
+      return Promise.reject('Ya existe un usuario con este email.');
+    }
+    const newUser: User = {
+      id: `user-${Date.now()}`,
+      ...userData,
+      clubIds: userData.role === 'ADMIN' ? [] : undefined,
+    };
+    users.push(newUser);
+    return simulate(newUser);
+  }
+
+  async updateUser(userData: User): Promise<User> {
+    const index = users.findIndex(u => u.id === userData.id);
+    if (index === -1) return Promise.reject("Usuario no encontrado.");
+    
+    if (users.some(u => u.email === userData.email && u.id !== userData.id)) {
+        return Promise.reject('Ya existe otro usuario con este email.');
+    }
+    
+    users[index] = { ...users[index], ...userData };
+    return simulate(users[index]);
+  }
+
+  async updateUserStatus(userId: string, isBanned: boolean): Promise<User> {
+      const user = users.find(u => u.id === userId);
+      if (!user) return Promise.reject("User not found");
+      user.isBanned = isBanned;
+      return simulate(user);
+  }
+  
+  async createClub(clubData: Omit<Club, 'id'>, adminId?: string): Promise<Club> {
+      const newClub: Club = {
+          id: `club-${Date.now()}`,
+          ...clubData
+      };
+      clubs.push(newClub);
+
+      if (adminId) {
+          const admin = users.find(u => u.id === adminId);
+          if (admin && admin.role === 'ADMIN') {
+              if (!admin.clubIds) admin.clubIds = [];
+              admin.clubIds.push(newClub.id);
+          }
+      }
+      return simulate(newClub);
+  }
+
+  async updateClub(clubData: Club, adminId?: string): Promise<Club> {
+      const index = clubs.findIndex(c => c.id === clubData.id);
+      if (index === -1) return Promise.reject("Club not found");
+      
+      // Update club details
+      clubs[index] = clubData;
+
+      // Find current and new admin
+      const currentAdmin = users.find(u => u.clubIds?.includes(clubData.id));
+      const newAdmin = users.find(u => u.id === adminId);
+
+      // If admin has changed
+      if (currentAdmin?.id !== newAdmin?.id) {
+          // Remove from old admin
+          if (currentAdmin && currentAdmin.clubIds) {
+              currentAdmin.clubIds = currentAdmin.clubIds.filter(id => id !== clubData.id);
+          }
+          // Add to new admin
+          if (newAdmin && newAdmin.role === 'ADMIN') {
+              if (!newAdmin.clubIds) newAdmin.clubIds = [];
+              newAdmin.clubIds.push(clubData.id);
+          }
+      }
+
+      return simulate(clubs[index]);
+  }
+
+  async deleteClub(clubId: string): Promise<void> {
+      // Delete club
+      clubs = clubs.filter(c => c.id !== clubId);
+      // Delete associated courts
+      courts = courts.filter(c => c.clubId !== clubId);
+      // Cancel future bookings for this club
+      bookings.forEach(b => {
+          if (b.clubId === clubId && new Date(b.startTime) > new Date()) {
+              b.status = 'CANCELLED';
+          }
+      });
+      // Remove club from admins
+      users.forEach(u => {
+          if (u.role === 'ADMIN' && u.clubIds) {
+              u.clubIds = u.clubIds.filter(id => id !== clubId);
+          }
+      });
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return;
+  }
+
 }
 
 export const apiService = new ApiService();

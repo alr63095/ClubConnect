@@ -15,6 +15,7 @@ import ProfilePage from './pages/ProfilePage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import Spinner from './components/ui/Spinner';
 import ClubSelectionPage from './pages/ClubSelectionPage';
+import ForumPage from './pages/ForumPage';
 
 interface ProtectedRouteProps {
   children: React.ReactElement;
@@ -82,6 +83,7 @@ const AppRoutes = () => {
                 {/* Player Routes */}
                 <Route path="/home" element={<ProtectedRoute roles={['PLAYER']}><HomePage /></ProtectedRoute>} />
                 <Route path="/bookings" element={<ProtectedRoute roles={['PLAYER']}><PlayerBookingsPage /></ProtectedRoute>} />
+                <Route path="/forum" element={<ProtectedRoute roles={['PLAYER']}><ForumPage /></ProtectedRoute>} />
 
                 {/* Common Protected Routes */}
                 <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
