@@ -80,7 +80,9 @@ const BookingItem: React.FC<{
     booking: EnrichedBooking, 
     onCancel: (bookingId: string) => void,
     onPublish: (booking: EnrichedBooking) => void,
-}> = ({booking, onCancel, onPublish}) => {
+    onAccept: (bookingId: string, userId: string) => void,
+    onReject: (bookingId: string, userId: string) => void,
+}> = ({booking, onCancel, onPublish, onAccept, onReject}) => {
     const isPast = new Date(booking.startTime) < new Date();
     const canCancel = !isPast && booking.status === 'CONFIRMED';
     const cancellationPending = booking.status === 'PENDING_CANCELLATION';
@@ -117,7 +119,7 @@ const BookingItem: React.FC<{
                     <div className="flex items-center gap-2 mt-1">{getStatusChip()}</div>
                     {isPublished && (
                         <div className="mt-2 text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-md inline-block font-medium">
-                            Publicada en foro: Buscando {booking.playersNeeded} (Nivel {booking.skillLevel})
+                            Publicada en foro: Buscando {booking.playersNeeded! - (booking.joinedPlayerIds?.length || 0)} jugador(es) (Nivel {booking.skillLevel})
                         </div>
                     )}
                 </div>
@@ -127,6 +129,29 @@ const BookingItem: React.FC<{
                     {canPublish && <Button variant="secondary" size="sm" onClick={() => onPublish(booking)}>Buscar Jugadores</Button>}
                 </div>
             </div>
+             {isPublished && booking.pendingPlayers && booking.pendingPlayers.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-teal-200">
+                    <h4 className="text-sm font-semibold text-text mb-2">Solicitudes para unirse:</h4>
+                    <div className="space-y-2">
+                        {booking.pendingPlayers.map(player => (
+                            <div key={player.id} className="flex items-center justify-between bg-white p-2 rounded-md shadow-sm">
+                                <div className="flex items-center gap-2">
+                                    <img src={`https://i.pravatar.cc/150?u=${player.id}`} alt={player.name} className="w-6 h-6 rounded-full" />
+                                    <span className="text-sm">{player.name}</span>
+                                </div>
+                                <div className="flex gap-1">
+                                    <Button size="sm" variant="ghost" className="!px-2 !py-1 text-red-600 hover:bg-red-50" onClick={() => onReject(booking.id, player.id)}>
+                                        Rechazar
+                                    </Button>
+                                    <Button size="sm" className="!px-2 !py-1" onClick={() => onAccept(booking.id, player.id)}>
+                                        Aceptar
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </motion.div>
     )
 }
@@ -172,6 +197,27 @@ const PlayerBookingsPage: React.FC = () => {
         }
     };
 
+    const handleAcceptRequest = async (bookingId: string, userId: string) => {
+        try {
+            await apiService.acceptJoinRequest(bookingId, userId);
+            toast.success("Jugador aceptado.");
+            fetchBookings();
+        } catch (error: any) {
+            toast.error(error.message || "No se pudo aceptar la solicitud.");
+        }
+    };
+
+    const handleRejectRequest = async (bookingId: string, userId: string) => {
+        try {
+            await apiService.rejectJoinRequest(bookingId, userId);
+            toast.success("Solicitud rechazada.");
+            fetchBookings();
+        } catch (error: any) {
+            toast.error(error.message || "No se pudo rechazar la solicitud.");
+        }
+    };
+
+
     const isLateCancellation = bookingToCancel ? differenceInHours(new Date(bookingToCancel.startTime), new Date()) <= 24 : false;
 
     const upcomingBookings = bookings.filter(b => new Date(b.startTime) >= new Date() && b.status !== 'CANCELLED');
@@ -187,7 +233,7 @@ const PlayerBookingsPage: React.FC = () => {
                     <h2 className="text-xl font-bold mb-4">Próximas Reservas</h2>
                     {upcomingBookings.length > 0 ? (
                         <div className="space-y-4">
-                            {upcomingBookings.map(b => <BookingItem key={b.id} booking={b} onCancel={handleCancelRequest} onPublish={setBookingToPublish} />)}
+                            {upcomingBookings.map(b => <BookingItem key={b.id} booking={b} onCancel={handleCancelRequest} onPublish={setBookingToPublish} onAccept={handleAcceptRequest} onReject={handleRejectRequest} />)}
                         </div>
                     ) : (
                         <p className="text-muted">No tienes ninguna reserva próxima.</p>
@@ -197,7 +243,7 @@ const PlayerBookingsPage: React.FC = () => {
                     <h2 className="text-xl font-bold mb-4">Historial de Reservas</h2>
                      {pastBookings.length > 0 ? (
                         <div className="space-y-4">
-                            {pastBookings.map(b => <BookingItem key={b.id} booking={b} onCancel={handleCancelRequest} onPublish={() => {}} />)}
+                            {pastBookings.map(b => <BookingItem key={b.id} booking={b} onCancel={handleCancelRequest} onPublish={() => {}} onAccept={() => {}} onReject={() => {}} />)}
                         </div>
                     ) : (
                         <p className="text-muted">Aún no has completado ninguna reserva.</p>

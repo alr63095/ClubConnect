@@ -309,6 +309,47 @@ class ApiService {
       return simulate({ message: 'Solicitud para unirse enviada.' });
   }
 
+  async acceptJoinRequest(bookingId: string, requestingUserId: string): Promise<{ message: string }> {
+      const booking = bookings.find(b => b.id === bookingId);
+      if (!booking) return Promise.reject({ message: 'Partida no encontrada.' });
+
+      const spotsFilled = (booking.joinedPlayerIds || []).length;
+      if (spotsFilled >= booking.playersNeeded!) {
+          booking.pendingPlayerIds = (booking.pendingPlayerIds || []).filter(id => id !== requestingUserId);
+          return Promise.reject({ message: 'Esta partida ya está completa.' });
+      }
+
+      const pendingIds = booking.pendingPlayerIds || [];
+      const userIndex = pendingIds.indexOf(requestingUserId);
+      if (userIndex === -1) {
+          return Promise.reject({ message: 'Este usuario no ha solicitado unirse.' });
+      }
+
+      pendingIds.splice(userIndex, 1);
+      if (!booking.joinedPlayerIds) {
+          booking.joinedPlayerIds = [];
+      }
+      booking.joinedPlayerIds.push(requestingUserId);
+
+      return simulate({ message: 'Jugador aceptado en la partida.' });
+  }
+
+  async rejectJoinRequest(bookingId: string, requestingUserId: string): Promise<{ message: string }> {
+      const booking = bookings.find(b => b.id === bookingId);
+      if (!booking) return Promise.reject({ message: 'Partida no encontrada.' });
+
+      const pendingIds = booking.pendingPlayerIds || [];
+      const userIndex = pendingIds.indexOf(requestingUserId);
+      if (userIndex === -1) {
+          return simulate({ message: 'El usuario ya no estaba en la lista de solicitudes.' });
+      }
+      
+      pendingIds.splice(userIndex, 1);
+      booking.pendingPlayerIds = pendingIds;
+
+      return simulate({ message: 'Solicitud rechazada.' });
+  }
+
   async requestCancelBooking(bookingId: string): Promise<{ message: string }> {
     const booking = bookings.find(b => b.id === bookingId);
     if (!booking) return Promise.reject({ message: 'Reserva no encontrada.' });
