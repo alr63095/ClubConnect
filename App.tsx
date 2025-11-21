@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -16,6 +17,7 @@ import SuperAdminPage from './pages/SuperAdminPage';
 import Spinner from './components/ui/Spinner';
 import ClubSelectionPage from './pages/ClubSelectionPage';
 import ForumPage from './pages/ForumPage';
+import NotificationManager from './components/NotificationManager';
 
 interface ProtectedRouteProps {
   children: React.ReactElement;
@@ -107,6 +109,7 @@ const App = () => {
   return (
     <AuthProvider>
         <Router>
+            <NotificationManager />
             <AppRoutes />
             <Toaster position="bottom-right" />
         </Router>

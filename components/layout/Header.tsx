@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -132,8 +133,14 @@ const Header: React.FC = () => {
                     )}
                     <div className="flex items-center gap-4 ml-4">
                         <ClubSwitcher />
-                        <NavLink to="/profile" className={getNavLinkClass}>
-                            {ICONS.PROFILE} Perfil
+                        <NavLink to="/profile" className="flex items-center gap-2">
+                            {user.avatar ? (
+                                <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover border border-slate-300" />
+                            ) : (
+                                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                </div>
+                            )}
                         </NavLink>
                         <Button variant="ghost" size="sm" onClick={logout} className="text-red-600 hover:bg-red-50">
                             {ICONS.LOGOUT} Salir
@@ -212,7 +219,16 @@ const Header: React.FC = () => {
                     )}
                     <div className="pt-4 mt-4 border-t border-gray-200">
                         <NavLink to="/profile" className={getMobileNavLinkClass} onClick={closeMenu}>
-                            {ICONS.PROFILE} Perfil
+                             <div className="flex items-center gap-2">
+                                 {user.avatar ? (
+                                     <img src={user.avatar} alt={user.name} className="w-6 h-6 rounded-full object-cover border border-slate-300" />
+                                 ) : (
+                                     <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-400">
+                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                     </div>
+                                 )}
+                                 <span>Perfil</span>
+                             </div>
                         </NavLink>
                         <Button 
                             variant="ghost" 

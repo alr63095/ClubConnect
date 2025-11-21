@@ -11,14 +11,14 @@ const simulate = <T>(data: T, delay = 500): Promise<T> =>
 // --- MOCK DATABASE ---
 
 let users: User[] = [
-  { id: 'user-1', name: 'Juan Pérez', email: 'juan@test.com', role: 'PLAYER', isBanned: false },
+  { id: 'user-1', name: 'Juan Pérez', email: 'juan@test.com', role: 'PLAYER', isBanned: false, sportPreferences: [{ sport: 'Pádel', skillLevel: 3 }, { sport: 'Tenis', skillLevel: 2 }] },
   { id: 'user-2', name: 'Ana García', email: 'ana@test.com', role: 'ADMIN', clubIds: ['club-1', 'club-2'], isBanned: false },
   { id: 'user-3', name: 'Super Admin', email: 'super@test.com', role: 'SUPER_ADMIN', isBanned: false },
-  { id: 'user-4', name: 'Carlos Sanz', email: 'carlos@test.com', role: 'PLAYER', isBanned: false },
+  { id: 'user-4', name: 'Carlos Sanz', email: 'carlos@test.com', role: 'PLAYER', isBanned: false, sportPreferences: [{ sport: 'Baloncesto', skillLevel: 4 }] },
   { id: 'user-5', name: 'Lucía Martín', email: 'lucia@test.com', role: 'PLAYER', isBanned: true },
   { id: 'user-6', name: 'Pedro Jiménez', email: 'pedro@test.com', role: 'ADMIN', clubIds: ['club-2'], isBanned: false },
-  { id: 'user-7', name: 'Sofía López', email: 'sofia@test.com', role: 'PLAYER', isBanned: false },
-  { id: 'user-8', name: 'Miguel Reyes', email: 'miguel@test.com', role: 'PLAYER', isBanned: false },
+  { id: 'user-7', name: 'Sofía López', email: 'sofia@test.com', role: 'PLAYER', isBanned: false, sportPreferences: [{ sport: 'Pádel', skillLevel: 4 }] },
+  { id: 'user-8', name: 'Miguel Reyes', email: 'miguel@test.com', role: 'PLAYER', isBanned: false, sportPreferences: [{ sport: 'Pádel', skillLevel: 3 }] },
 ];
 
 let clubs: Club[] = [
@@ -126,7 +126,7 @@ class ApiService {
     return Promise.reject('Invalid credentials');
   }
 
-  async register(name: string, email: string, pass: string): Promise<User> {
+  async register(name: string, email: string, pass: string, sportPreferences: { sport: string; skillLevel: number }[]): Promise<User> {
     if (users.some(u => u.email === email)) {
       return Promise.reject('User with this email already exists');
     }
@@ -135,6 +135,7 @@ class ApiService {
       name,
       email,
       role: 'PLAYER',
+      sportPreferences,
     };
     users.push(newUser);
     return simulate(newUser);
@@ -149,6 +150,11 @@ class ApiService {
 
   async getClubs(): Promise<Club[]> {
     return simulate(clubs);
+  }
+  
+  async getAllSports(): Promise<string[]> {
+    const allSports = new Set(clubs.flatMap(c => c.sports));
+    return simulate(Array.from(allSports).sort());
   }
   
   async getClubById(clubId: string): Promise<Club> {

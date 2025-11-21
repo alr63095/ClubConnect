@@ -1,24 +1,58 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
-import { motion } from 'framer-motion';
+// Fix: Import AnimatePresence to be used for animations.
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
+import { apiService } from '../services/apiService';
+import Spinner from '../components/ui/Spinner';
 
 const RegisterPage: React.FC = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [loadingSports, setLoadingSports] = useState(true);
+    const [allSports, setAllSports] = useState<string[]>([]);
+    const [preferences, setPreferences] = useState<{ [key: string]: number }>({});
+
     const auth = useAuth();
+
+    useEffect(() => {
+        apiService.getAllSports()
+            .then(setAllSports)
+            .catch(() => toast.error('No se pudieron cargar los deportes.'))
+            .finally(() => setLoadingSports(false));
+    }, []);
+
+    const handleSportSelection = (sport: string, isSelected: boolean) => {
+        setPreferences(prev => {
+            const newPrefs = { ...prev };
+            if (isSelected) {
+                newPrefs[sport] = 3; // Default skill level
+            } else {
+                delete newPrefs[sport];
+            }
+            return newPrefs;
+        });
+    };
+
+    const handleSkillChange = (sport: string, skillLevel: number) => {
+        setPreferences(prev => ({
+            ...prev,
+            [sport]: skillLevel,
+        }));
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         try {
-            await auth.register(name, email, password);
+            const sportPreferences = Object.entries(preferences).map(([sport, skillLevel]) => ({ sport, skillLevel }));
+            await auth.register(name, email, password, sportPreferences);
             toast.success('¡Registro completado! Bienvenido a ClubConnect.');
             // La navegación ahora es gestionada por App.tsx, que redirigirá al usuario
             // a la página principal al detectar el nuevo estado de 'user'.
@@ -65,7 +99,54 @@ const RegisterPage: React.FC = () => {
                         required
                         placeholder="••••••••"
                     />
-                    <Button type="submit" className="w-full" isLoading={isLoading}>
+
+                    <div className="pt-4 border-t">
+                        <h3 className="text-lg font-semibold mb-2">Preferencias Deportivas (Opcional)</h3>
+                        <p className="text-sm text-muted mb-3">Selecciona los deportes que practicas y tu nivel para recibir sugerencias personalizadas.</p>
+                        {loadingSports ? <Spinner /> : (
+                            <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                                {allSports.map(sport => (
+                                    <div key={sport}>
+                                        <label className="flex items-center gap-3 cursor-pointer">
+                                            <input 
+                                                type="checkbox"
+                                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                onChange={(e) => handleSportSelection(sport, e.target.checked)}
+                                            />
+                                            <span className="font-medium text-text">{sport}</span>
+                                        </label>
+                                        <AnimatePresence>
+                                        {preferences.hasOwnProperty(sport) && (
+                                            <motion.div 
+                                                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                                                animate={{ opacity: 1, height: 'auto', marginTop: '0.5rem' }}
+                                                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                                                className="ml-7"
+                                            >
+                                                <label htmlFor={`skill-${sport}`} className="text-sm text-muted mb-1 block">Tu nivel en {sport}</label>
+                                                <select
+                                                    id={`skill-${sport}`}
+                                                    value={preferences[sport]}
+                                                    onChange={(e) => handleSkillChange(sport, parseInt(e.target.value))}
+                                                    className="w-full px-3 py-1.5 border border-slate-300 rounded-md shadow-sm bg-white text-text text-sm"
+                                                >
+                                                    <option value="1">1 (Principiante)</option>
+                                                    <option value="2">2 (Ocasional)</option>
+                                                    <option value="3">3 (Intermedio)</option>
+                                                    <option value="4">4 (Avanzado)</option>
+                                                    <option value="5">5 (Competición)</option>
+                                                </select>
+                                            </motion.div>
+                                        )}
+                                        </AnimatePresence>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+
+                    <Button type="submit" className="w-full !mt-6" isLoading={isLoading}>
                         Registrarse
                     </Button>
                 </form>

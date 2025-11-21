@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { User } from '../types';
 import { apiService } from '../services/apiService';
@@ -8,8 +9,9 @@ interface AuthContextType {
   selectedClubId: string | null;
   selectClub: (clubId: string) => void;
   login: (email: string, pass: string) => Promise<User>;
-  register: (name: string, email: string, pass: string) => Promise<void>;
+  register: (name: string, email: string, pass: string, sportPreferences: { sport: string; skillLevel: number; }[]) => Promise<void>;
   logout: () => void;
+  updateUserProfile: (updatedUser: User) => void;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -78,8 +80,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [selectClub]);
 
-  const register = useCallback(async (name: string, email: string, pass: string) => {
-    const newUser = await apiService.register(name, email, pass);
+  const register = useCallback(async (name: string, email: string, pass: string, sportPreferences: { sport: string; skillLevel: number; }[]) => {
+    const newUser = await apiService.register(name, email, pass, sportPreferences);
     setUser(newUser);
     sessionStorage.setItem('user', JSON.stringify(newUser));
   }, []);
@@ -91,8 +93,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.removeItem('selectedClubId');
   }, []);
 
+  const updateUserProfile = useCallback((updatedUser: User) => {
+      setUser(updatedUser);
+      sessionStorage.setItem('user', JSON.stringify(updatedUser));
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, selectedClubId, selectClub, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, selectedClubId, selectClub, login, register, logout, updateUserProfile }}>
       {children}
     </AuthContext.Provider>
   );

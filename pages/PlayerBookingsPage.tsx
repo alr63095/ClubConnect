@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { EnrichedBooking } from '../types';
@@ -136,7 +137,13 @@ const BookingItem: React.FC<{
                         {booking.pendingPlayers.map(player => (
                             <div key={player.id} className="flex items-center justify-between bg-white p-2 rounded-md shadow-sm">
                                 <div className="flex items-center gap-2">
-                                    <img src={`https://i.pravatar.cc/150?u=${player.id}`} alt={player.name} className="w-6 h-6 rounded-full" />
+                                    {player.avatar ? (
+                                        <img src={player.avatar} alt={player.name} className="w-6 h-6 rounded-full object-cover border border-slate-200" />
+                                    ) : (
+                                        <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                        </div>
+                                    )}
                                     <span className="text-sm">{player.name}</span>
                                 </div>
                                 <div className="flex gap-1">

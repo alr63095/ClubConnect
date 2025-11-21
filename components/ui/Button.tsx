@@ -1,9 +1,9 @@
+
 import React from 'react';
 // Fix: Import HTMLMotionProps to correctly type the props for a motion component.
 import { motion, HTMLMotionProps } from 'framer-motion';
 
-// Fix: Added the 'size' property to allow for different button sizes.
-// Fix: Changed props to extend HTMLMotionProps<'button'> to be compatible with framer-motion's motion.button component.
+// Fix: Extend HTMLMotionProps<'button'> to be compatible with framer-motion's motion.button component.
 // This resolves the type error on props like 'onDrag'.
 type ButtonProps = HTMLMotionProps<'button'> & {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -15,13 +15,14 @@ type ButtonProps = HTMLMotionProps<'button'> & {
 // Fix: Added 'size' to the component's props with a default value of 'md'.
 const Button: React.FC<ButtonProps> = ({ children, variant = 'primary', size = 'md', isLoading = false, ...props }) => {
   // Fix: Removed hardcoded padding 'px-4 py-2' to allow dynamic sizing.
-  const baseClasses = 'rounded-lg font-semibold transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2';
+  // Added 'border' to base classes to ensure layout consistency
+  const baseClasses = 'rounded-lg font-semibold transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border';
 
   const variantClasses = {
-    primary: 'bg-primary text-white hover:bg-primary-dark focus:ring-primary',
-    secondary: 'bg-secondary text-white hover:bg-secondary-dark focus:ring-secondary',
-    ghost: 'bg-transparent text-primary hover:bg-teal-50 focus:ring-primary',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+    primary: 'bg-primary text-white border-primary-dark hover:bg-primary-dark focus:ring-primary shadow-sm hover:shadow-md',
+    secondary: 'bg-secondary text-white border-secondary-dark hover:bg-secondary-dark focus:ring-secondary shadow-sm hover:shadow-md',
+    ghost: 'bg-transparent text-primary border-transparent hover:bg-teal-50 focus:ring-primary hover:border-teal-100',
+    danger: 'bg-red-600 text-white border-red-700 hover:bg-red-700 focus:ring-red-500 shadow-sm hover:shadow-md',
   };
 
   // Fix: Added size-specific classes.
@@ -33,8 +34,8 @@ const Button: React.FC<ButtonProps> = ({ children, variant = 'primary', size = '
 
   return (
     <motion.button
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
       // Fix: Applied the appropriate size class based on the 'size' prop.
       className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]}`}
       disabled={isLoading}

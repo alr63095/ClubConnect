@@ -46,24 +46,44 @@ const HomePage: React.FC = () => {
   }, []);
 
   const fetchAvailability = async () => {
-    if (!selectedSport || !selectedDate) {
-      toast.error('Por favor, selecciona un deporte y una fecha.');
+    const sportsToSearchFor = selectedSport ? [selectedSport] : (user?.sportPreferences?.map(p => p.sport) || []);
+
+    if (sportsToSearchFor.length === 0 || !selectedDate) {
+      toast.error('Por favor, selecciona un deporte o establece tus preferencias en tu perfil.');
       return;
     }
+    
     setSearching(true);
     setAvailability(null);
     try {
         const localDate = new Date(selectedDate + 'T00:00:00');
         if (selectedClub) {
-            const availabilityData = await apiService.getAvailability(selectedClub.id, selectedSport, localDate);
-            if (availabilityData.length > 0) {
-              setAvailability([{ club: selectedClub, availability: availabilityData }]);
+            const results = await Promise.all(
+                sportsToSearchFor.map(sport => apiService.getAvailability(selectedClub.id, sport, localDate))
+            );
+            const flattenedResults = results.flat();
+            if (flattenedResults.length > 0) {
+              setAvailability([{ club: selectedClub, availability: flattenedResults }]);
             } else {
               setAvailability([]);
             }
         } else {
-            const globalAvailabilityData = await apiService.getGlobalAvailability(selectedSport, localDate);
-            setAvailability(globalAvailabilityData);
+            const results = await Promise.all(
+                sportsToSearchFor.map(sport => apiService.getGlobalAvailability(sport, localDate))
+            );
+            const flattenedResults = results.flat();
+            
+            const mergedAvailability: GroupedAvailability[] = [];
+            flattenedResults.forEach(item => {
+                const existingClub = mergedAvailability.find(i => i.club.id === item.club.id);
+                if (existingClub) {
+                    existingClub.availability.push(...item.availability);
+                } else {
+                    mergedAvailability.push(item);
+                }
+            });
+
+            setAvailability(mergedAvailability);
         }
     } catch(error){
         toast.error("Error al buscar disponibilidad.");
@@ -146,7 +166,7 @@ const HomePage: React.FC = () => {
                     onChange={e => setSelectedSport(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm bg-white text-text"
                 >
-                    <option value="">Selecciona un deporte</option>
+                    <option value="">{user?.sportPreferences?.length ? 'Mis deportes preferidos' : 'Selecciona un deporte'}</option>
                     {sportsToShow.map(sport => <option key={sport} value={sport}>{sport}</option>)}
                 </select>
             </div>
@@ -165,7 +185,7 @@ const HomePage: React.FC = () => {
 
         {availability && (
             <motion.div initial={{opacity: 0}} animate={{opacity: 1}}>
-                <h2 className="text-2xl font-bold mb-4">Pistas disponibles para {selectedSport} el {new Date(selectedDate+'T00:00:00').toLocaleDateString()}</h2>
+                <h2 className="text-2xl font-bold mb-4">Pistas disponibles el {new Date(selectedDate+'T00:00:00').toLocaleDateString()}</h2>
                 {availability.length > 0 ? (
                     <div className="space-y-8">
                         {availability.map(({ club, availability: clubAvailability }) => (

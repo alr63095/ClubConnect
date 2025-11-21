@@ -1,3 +1,4 @@
+
 export type UserRole = 'PLAYER' | 'ADMIN' | 'SUPER_ADMIN';
 
 export interface User {
@@ -7,6 +8,8 @@ export interface User {
   role: UserRole;
   clubIds?: string[]; // Un admin puede gestionar varios clubs
   isBanned?: boolean;
+  sportPreferences?: { sport: string; skillLevel: number }[];
+  avatar?: string; // Base64 string de la imagen de perfil
 }
 
 export interface Club {

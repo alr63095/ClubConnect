@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { EnrichedBooking } from '../types';
@@ -7,7 +8,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Spinner from '../components/ui/Spinner';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
+import { format, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ICONS } from '../constants';
 
@@ -56,11 +57,20 @@ const ForumPostCard: React.FC<{
 
     const buttonState = getButtonState();
 
+    const hoursUntilStart = differenceInHours(new Date(post.startTime), new Date());
+    const isUrgent = hoursUntilStart >= 0 && hoursUntilStart < 24;
+
     return (
-        <Card>
+        <Card className={isUrgent ? 'ring-2 ring-secondary ring-offset-2' : ''}>
             <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex-shrink-0 text-center">
-                    <img src={`https://i.pravatar.cc/150?u=${post.user.id}`} alt={post.user.name} className="w-20 h-20 rounded-full mx-auto" />
+                    {post.user.avatar ? (
+                         <img src={post.user.avatar} alt={post.user.name} className="w-20 h-20 rounded-full mx-auto object-cover border-2 border-slate-200" />
+                    ) : (
+                        <div className="w-20 h-20 rounded-full mx-auto bg-slate-200 flex items-center justify-center text-slate-400">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                        </div>
+                    )}
                     <p className="font-semibold mt-2 text-sm text-text truncate w-24">{post.user.name}</p>
                 </div>
                 <div className="flex-grow">
@@ -141,20 +151,9 @@ const ForumPage: React.FC = () => {
             tempPosts = tempPosts.filter(p => p.skillLevel === parseInt(filters.skillLevel, 10));
         }
         
-        const isViewingAll = !filters.sport && !filters.date && !filters.skillLevel;
-
-        if (isViewingAll) {
-            // "Ver Todos": Sort by sport, then by time
-            tempPosts.sort((a, b) => {
-                const sportCompare = a.court.sport.localeCompare(b.court.sport);
-                if (sportCompare !== 0) return sportCompare;
-                return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
-            });
-        } else {
-             // Filtered view: Sort chronologically
-            tempPosts.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-        }
-
+        // Always sort chronologically
+        tempPosts.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+        
         return tempPosts;
     }, [allPosts, filters]);
 
