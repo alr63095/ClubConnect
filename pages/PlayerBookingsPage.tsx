@@ -1,13 +1,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { EnrichedBooking } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { apiService } from '../services/apiService';
 import Card from '../components/ui/Card';
 import Spinner from '../components/ui/Spinner';
-import { format, differenceInHours } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { differenceInHours } from 'date-fns';
 import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
 import Modal from '../components/ui/Modal';
@@ -22,7 +21,6 @@ const PublishBookingModal: React.FC<{
     const [isPublishing, setIsPublishing] = useState(false);
 
     useEffect(() => {
-        // Reset form when a new booking is selected
         if (booking) {
             setPlayersNeeded(1);
             setSkillLevel(3);
@@ -91,75 +89,122 @@ const BookingItem: React.FC<{
     const canPublish = !isPast && booking.status === 'CONFIRMED' && !booking.playersNeeded;
     const isPublished = !isPast && booking.status === 'CONFIRMED' && booking.playersNeeded;
 
+    // Formateo seguro de fecha y hora usando Intl
+    const dateObj = new Date(booking.startTime);
+    const endDateObj = new Date(booking.endTime);
+    
+    const dateString = new Intl.DateTimeFormat('es-ES', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    }).format(dateObj);
+    
+    const startTimeString = new Intl.DateTimeFormat('es-ES', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    }).format(dateObj);
+
+    const endTimeString = new Intl.DateTimeFormat('es-ES', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    }).format(endDateObj);
 
     const getStatusChip = () => {
         if (cancellationPending) {
-            return <span className="text-xs font-bold bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full">Cancelación Pendiente</span>;
+            return <span className="text-xs font-bold bg-yellow-200 text-yellow-800 px-3 py-1 rounded-full">Cancelación Pendiente</span>;
         }
         if (isCancelled) {
-            return <span className="text-xs font-bold bg-red-200 text-red-800 px-2 py-1 rounded-full">Cancelada</span>;
+            return <span className="text-xs font-bold bg-red-200 text-red-800 px-3 py-1 rounded-full">Cancelada</span>;
         }
         return null;
     }
 
     return (
-        <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className={`p-4 rounded-lg flex flex-col gap-4 ${isPast || isCancelled ? 'bg-slate-50' : 'bg-teal-50'}`}
-        >
-            <div className="flex items-start gap-4">
-                <div className={`mt-1 p-3 rounded-full ${isPast || isCancelled ? 'bg-slate-200 text-slate-600' : 'bg-primary-light text-primary-dark'}`}>
-                    {isPast || isCancelled ? '✓' : '◷'}
-                </div>
-                <div className="flex-grow">
-                    <p className={`font-bold ${isPast || isCancelled ? 'text-muted' : 'text-text'}`}>{booking.court.name} - {booking.court.sport}</p>
-                    <p className="text-sm text-muted">{booking.club.name}</p>
-                    <p className="text-sm text-muted">{format(new Date(booking.startTime), "eeee, d 'de' MMMM 'de' yyyy", { locale: es })}</p>
-                    <p className="text-sm text-muted">{format(new Date(booking.startTime), 'HH:mm')} - {format(new Date(booking.endTime), 'HH:mm')}</p>
-                    <div className="flex items-center gap-2 mt-1">{getStatusChip()}</div>
-                    {isPublished && (
-                        <div className="mt-2 text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-md inline-block font-medium">
-                            Publicada en foro: Buscando {booking.playersNeeded! - (booking.joinedPlayerIds?.length || 0)} jugador(es) (Nivel {booking.skillLevel})
-                        </div>
-                    )}
-                </div>
-                <div className="text-right flex flex-col items-end gap-1">
-                    <p className={`font-bold text-lg ${isPast || isCancelled ? 'text-muted' : 'text-primary'}`}>{booking.totalPrice}€</p>
-                    {canCancel && <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => onCancel(booking.id)}>Cancelar</Button>}
-                    {canPublish && <Button variant="secondary" size="sm" onClick={() => onPublish(booking)}>Buscar Jugadores</Button>}
-                </div>
-            </div>
-             {isPublished && booking.pendingPlayers && booking.pendingPlayers.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-teal-200">
-                    <h4 className="text-sm font-semibold text-text mb-2">Solicitudes para unirse:</h4>
-                    <div className="space-y-2">
-                        {booking.pendingPlayers.map(player => (
-                            <div key={player.id} className="flex items-center justify-between bg-white p-2 rounded-md shadow-sm">
-                                <div className="flex items-center gap-2">
-                                    {player.avatar ? (
-                                        <img src={player.avatar} alt={player.name} className="w-6 h-6 rounded-full object-cover border border-slate-200" />
-                                    ) : (
-                                        <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-400">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                                        </div>
-                                    )}
-                                    <span className="text-sm">{player.name}</span>
-                                </div>
-                                <div className="flex gap-1">
-                                    <Button size="sm" variant="ghost" className="!px-2 !py-1 text-red-600 hover:bg-red-50" onClick={() => onReject(booking.id, player.id)}>
-                                        Rechazar
-                                    </Button>
-                                    <Button size="sm" className="!px-2 !py-1" onClick={() => onAccept(booking.id, player.id)}>
-                                        Aceptar
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
+        <Card className={`!p-0 overflow-hidden border transition-shadow hover:shadow-lg ${isPast || isCancelled ? 'opacity-90 bg-gray-50' : 'bg-white border-slate-200'}`}>
+             {/* Header de la tarjeta con Fecha y Hora destacadas */}
+            <div className={`px-6 py-4 border-b ${isPast ? 'bg-gray-200 text-gray-600' : 'bg-gradient-to-r from-teal-50 to-white'}`}>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                    <div>
+                        <h3 className={`text-2xl font-extrabold capitalize ${isPast ? 'text-gray-600' : 'text-primary'}`}>
+                            {startTimeString} - {endTimeString}
+                        </h3>
+                        <p className="text-lg font-medium capitalize text-slate-600">{dateString}</p>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-2xl font-bold text-slate-800">{booking.totalPrice}€</span>
                     </div>
                 </div>
-            )}
-        </motion.div>
+            </div>
+
+            {/* Cuerpo de la tarjeta */}
+            <div className="p-6">
+                <div className="flex flex-col md:flex-row gap-6 justify-between items-start">
+                    <div className="space-y-2 flex-grow">
+                        <div className="flex items-center gap-2">
+                             <span className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded uppercase">{booking.court.sport}</span>
+                             {getStatusChip()}
+                        </div>
+                        <h4 className="text-xl font-bold text-gray-900">{booking.court.name}</h4>
+                        <p className="text-muted flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            {booking.club.name}
+                        </p>
+                        
+                        {isPublished && (
+                            <div className="mt-3 bg-blue-50 border border-blue-100 text-blue-800 px-3 py-2 rounded-md inline-block w-full md:w-auto">
+                                <p className="text-sm font-bold">Partida Pública</p>
+                                <p className="text-xs">Buscando {booking.playersNeeded! - (booking.joinedPlayerIds?.length || 0)} jugador(es) • Nivel {booking.skillLevel}</p>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 w-full md:w-auto justify-end">
+                         {canCancel && (
+                            <Button variant="danger" size="sm" className="bg-white text-red-600 border-red-200 hover:bg-red-50" onClick={() => onCancel(booking.id)}>
+                                Cancelar Reserva
+                            </Button>
+                        )}
+                        {canPublish && (
+                            <Button variant="secondary" size="sm" onClick={() => onPublish(booking)}>
+                                Buscar Jugadores
+                            </Button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Sección de Solicitudes (Foro) */}
+                {isPublished && booking.pendingPlayers && booking.pendingPlayers.length > 0 && (
+                    <div className="mt-6 pt-4 border-t border-gray-100">
+                        <h4 className="text-sm font-semibold text-text mb-3">Solicitudes para unirse:</h4>
+                        <div className="space-y-3">
+                            {booking.pendingPlayers.map(player => (
+                                <div key={player.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                    <div className="flex items-center gap-3">
+                                        {player.avatar ? (
+                                            <img src={player.avatar} alt={player.name} className="w-8 h-8 rounded-full object-cover border border-slate-200" />
+                                        ) : (
+                                            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-400">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                            </div>
+                                        )}
+                                        <span className="font-medium text-sm">{player.name}</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 text-xs" onClick={() => onReject(booking.id, player.id)}>
+                                            Rechazar
+                                        </Button>
+                                        <Button size="sm" className="text-xs" onClick={() => onAccept(booking.id, player.id)}>
+                                            Aceptar
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </Card>
     )
 }
 
@@ -169,6 +214,9 @@ const PlayerBookingsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [bookingToCancel, setBookingToCancel] = useState<EnrichedBooking | null>(null);
     const [bookingToPublish, setBookingToPublish] = useState<EnrichedBooking | null>(null);
+    
+    // State to toggle between "Upcoming" (default) and "History"
+    const [showHistory, setShowHistory] = useState(false);
 
     const fetchBookings = useCallback(() => {
         if (user) {
@@ -227,35 +275,87 @@ const PlayerBookingsPage: React.FC = () => {
 
     const isLateCancellation = bookingToCancel ? differenceInHours(new Date(bookingToCancel.startTime), new Date()) <= 24 : false;
 
-    const upcomingBookings = bookings.filter(b => new Date(b.startTime) >= new Date() && b.status !== 'CANCELLED');
-    const pastBookings = bookings.filter(b => new Date(b.startTime) < new Date() || b.status === 'CANCELLED');
+    // Ordenar próximas reservas: de la más cercana a la más lejana
+    const upcomingBookings = bookings
+        .filter(b => new Date(b.startTime) >= new Date() && b.status !== 'CANCELLED')
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+    // Ordenar historial: de la más reciente a la más antigua
+    const pastBookings = bookings
+        .filter(b => new Date(b.startTime) < new Date() || b.status === 'CANCELLED')
+        .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
     if (loading) return <Spinner />;
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <h1 className="text-3xl font-bold mb-6">Mis Reservas</h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <Card>
-                    <h2 className="text-xl font-bold mb-4">Próximas Reservas</h2>
-                    {upcomingBookings.length > 0 ? (
-                        <div className="space-y-4">
-                            {upcomingBookings.map(b => <BookingItem key={b.id} booking={b} onCancel={handleCancelRequest} onPublish={setBookingToPublish} onAccept={handleAcceptRequest} onReject={handleRejectRequest} />)}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                <h1 className="text-3xl font-bold text-gray-900">
+                    {showHistory ? 'Historial de Reservas' : 'Mis Reservas'}
+                </h1>
+                <Button 
+                    variant="secondary" 
+                    onClick={() => setShowHistory(!showHistory)}
+                    className="whitespace-nowrap"
+                >
+                    {showHistory ? 'Ver Próximas Reservas' : 'Ver Historial'}
+                </Button>
+            </div>
+
+            <div className="space-y-6">
+                {!showHistory ? (
+                    // VISTA DE PRÓXIMAS RESERVAS
+                    upcomingBookings.length > 0 ? (
+                        <div className="space-y-6">
+                            {upcomingBookings.map(b => (
+                                <BookingItem 
+                                    key={b.id} 
+                                    booking={b} 
+                                    onCancel={handleCancelRequest} 
+                                    onPublish={setBookingToPublish} 
+                                    onAccept={handleAcceptRequest} 
+                                    onReject={handleRejectRequest} 
+                                />
+                            ))}
                         </div>
                     ) : (
-                        <p className="text-muted">No tienes ninguna reserva próxima.</p>
-                    )}
-                </Card>
-                <Card>
-                    <h2 className="text-xl font-bold mb-4">Historial de Reservas</h2>
-                     {pastBookings.length > 0 ? (
-                        <div className="space-y-4">
-                            {pastBookings.map(b => <BookingItem key={b.id} booking={b} onCancel={handleCancelRequest} onPublish={() => {}} onAccept={() => {}} onReject={() => {}} />)}
-                        </div>
-                    ) : (
-                        <p className="text-muted">Aún no has completado ninguna reserva.</p>
-                    )}
-                </Card>
+                        <Card className="text-center py-12 bg-teal-50 border border-teal-100">
+                            <div className="flex flex-col items-center">
+                                <div className="bg-teal-100 p-4 rounded-full mb-4 text-teal-600">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                </div>
+                                <h3 className="text-xl font-bold text-primary mb-2">No tienes reservas activas</h3>
+                                <p className="text-muted mb-6">¿A qué esperas para jugar? Encuentra tu pista ideal ahora.</p>
+                            </div>
+                        </Card>
+                    )
+                ) : (
+                    // VISTA DE HISTORIAL
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="space-y-6"
+                    >
+                        {pastBookings.length > 0 ? (
+                            <div className="space-y-6">
+                                {pastBookings.map(b => (
+                                    <BookingItem 
+                                        key={b.id} 
+                                        booking={b} 
+                                        onCancel={handleCancelRequest} 
+                                        onPublish={() => {}} 
+                                        onAccept={() => {}} 
+                                        onReject={() => {}} 
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <Card className="text-center py-12">
+                                <p className="text-muted italic">No hay historial disponible.</p>
+                            </Card>
+                        )}
+                    </motion.div>
+                )}
             </div>
 
             <PublishBookingModal
@@ -270,7 +370,7 @@ const PlayerBookingsPage: React.FC = () => {
             <Modal isOpen={!!bookingToCancel} onClose={() => setBookingToCancel(null)} title="Confirmar Cancelación">
                 {bookingToCancel && (
                     <div>
-                        <p>¿Estás seguro de que quieres cancelar tu reserva para <strong>{bookingToCancel.court.name}</strong> el <strong>{format(new Date(bookingToCancel.startTime), "d 'de' MMMM 'a las' HH:mm", { locale: es })}</strong>?</p>
+                        <p>¿Estás seguro de que quieres cancelar tu reserva para <strong>{bookingToCancel.court.name}</strong>?</p>
                         {isLateCancellation && (
                             <div className="mt-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-r-md">
                                 <p className="font-bold">Aviso</p>
